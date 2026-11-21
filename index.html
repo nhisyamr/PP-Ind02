@@ -2313,10 +2313,31 @@
 
           // 1. Hardware Confirmation Check for Pending STORE / RETRIEVE Operations
           if (pendingOperation) {
-            if (esp32Running || Number(data.step_stage) > 0) {
+            const elapsedMs = Date.now() - pendingOperation.dispatchedAt;
+
+            // Mark as actively running only when ESP32 enters the ASRS sequence for our target box
+            if (
+              (esp32Running && Number(data.step_stage) > 0) ||
+              statusStr.includes("STEP 3") ||
+              statusStr.includes("STEP 4") ||
+              statusStr.includes("STEP 5") ||
+              statusStr.includes("STEP 6")
+            ) {
               pendingOperation.sawRunning = true;
             }
-            if (esp32Locked || statusStr.includes("STOP") || statusStr.includes("REJECTED") || statusStr.includes("INVALID")) {
+
+            // Only treat as an explicit abort if:
+            // - System is locked (E-STOP), OR
+            // - After a 1200ms poll grace period, ESP32 reports an explicit rejection/error/manual stop
+            //   (specifically excluding "SERVO TARGET REV REACHED (STOP)" which is a normal servo completion message)
+            const isExplicitAbortStatus =
+              statusStr === "STOPPED" ||
+              statusStr.startsWith("EMERGENCY") ||
+              statusStr.startsWith("REJECTED") ||
+              statusStr.startsWith("INVALID") ||
+              (pendingOperation.sawRunning && statusStr === "STOPPED");
+
+            if (esp32Locked || (elapsedMs > 1200 && isExplicitAbortStatus)) {
               setOperationFeedback(`Aborted by ESP32: ${statusStr}`, "error");
               pendingOperation = null;
               const syncBadge = document.getElementById("pendingSyncBadge");
@@ -2326,7 +2347,7 @@
               }
               renderRackMatrix();
             } else if (
-              statusStr.includes("CYCLE COMPLETE") ||
+              (pendingOperation.sawRunning && statusStr.includes("CYCLE COMPLETE")) ||
               (pendingOperation.sawRunning && !esp32Running && Number(data.step_stage) === 0)
             ) {
               commitPendingOperationOnHardwareConfirm();
