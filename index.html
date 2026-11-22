@@ -2262,6 +2262,12 @@
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         appendLog(`Delivered: "${cleanCmd}"`, "success");
+        if (asrsTwin) {
+          cadSimActive = false;
+          const simBtn = document.getElementById("cadSimBtn");
+          if (simBtn) simBtn.classList.remove("active");
+          asrsTwin.notifyCommand(cleanCmd);
+        }
         return true;
       } catch (err) {
         appendLog(`Command failed: ${err.message}`, "error");
@@ -2361,129 +2367,188 @@
       }
     }
 
-    // Poll ESP32 Telemetry (/asrs/telemetry) every 1000ms
+    // Real-time Firebase RTDB SSE cache & stream handle
+    let liveTelemetryCache = {};
+    let telemetryEventSource = null;
+    let telemetryStreamConnected = false;
+
+    function applyTelemetryPayload(data) {
+      esp32Online = true;
+      const dot = document.getElementById("connDot");
+      const connText = document.getElementById("connStateText");
+      dot.className = "w-2 h-2 rounded-full bg-[#AFFF00]";
+      if (connText) connText.textContent = "ONLINE";
+
+      if (!data || typeof data !== "object") return;
+
+      const prevRunning = esp32Running;
+      const statusStr = String(data.status || "ONLINE").toUpperCase();
+      esp32Running = !!data.running;
+      esp32Locked = !!data.locked;
+      if (prevRunning && !esp32Running && !pendingOperation) {
+        fetchInventoryFromFirebase();
+      }
+
+      const badge = document.getElementById("systemStatusBadge");
+      badge.textContent = statusStr;
+      badge.className = esp32Locked
+        ? "cat-badge badge-coral !h-[20px] !min-w-[54px] !text-[10px]"
+        : esp32Running
+          ? "cat-badge badge-yellow !h-[20px] !min-w-[54px] !text-[10px]"
+          : "cat-badge badge-mint !h-[20px] !min-w-[54px] !text-[10px]";
+
+      const lockBadge = document.getElementById("lockStateBadge");
+      if (lockBadge) {
+        lockBadge.textContent = esp32Locked ? "LOCKED" : "UNLOCKED";
+        lockBadge.className = esp32Locked ? "cat-badge badge-coral" : "cat-badge badge-mint";
+      }
+
+      const m1RevVal = Number(data.m1_rev || 0);
+      const m2RevVal = Number(data.m2_rev || 0);
+      document.getElementById("m1Rev").textContent = m1RevVal.toFixed(2);
+      document.getElementById("m2Rev").textContent = m2RevVal.toFixed(2);
+      document.getElementById("m1Steps").textContent = data.m1_steps || 0;
+      document.getElementById("m2Steps").textContent = data.m2_steps || 0;
+
+      if (data.servo_state !== undefined) {
+        const svBadge = document.getElementById("servoStateBadge");
+        svBadge.textContent = data.servo_state;
+        svBadge.className = data.servo_state === "STOP"
+          ? "cat-badge badge-muted"
+          : "cat-badge badge-yellow";
+      }
+      if (data.box !== undefined) {
+        document.getElementById("activeBoxBadge").textContent =
+          data.op && data.op !== "NONE" ? `${data.box} (${data.op})` : data.box;
+      }
+      if (data.step_stage !== undefined) {
+        document.getElementById("cycleStagePill").textContent =
+          data.step_stage > 0 ? `STEP ${data.step_stage} / 6` : statusStr;
+        updateSequenceStepHighlight(data.step_stage);
+      }
+      if (data.rpm !== undefined || data.accel !== undefined) {
+        updateGaugesUI(data.rpm, data.accel);
+      }
+      if (data.servo_ext_rev !== undefined) {
+        document.getElementById("liveServoExtRev").textContent = Number(data.servo_ext_rev).toFixed(2);
+      }
+      if (data.servo_ret_rev !== undefined) {
+        document.getElementById("liveServoRetRev").textContent = Number(data.servo_ret_rev).toFixed(2);
+      }
+      if (data.z_offset !== undefined && !isNaN(parseFloat(data.z_offset))) {
+        zLiftOffsetRev = parseFloat(data.z_offset);
+        updateZOffsetReadouts();
+      }
+
+      // 1. Hardware Confirmation Check for Pending STORE / RETRIEVE Operations
+      if (pendingOperation) {
+        if (esp32Running || Number(data.step_stage) > 0) {
+          pendingOperation.sawRunning = true;
+        }
+        if (esp32Locked || statusStr.includes("STOP") || statusStr.includes("REJECTED") || statusStr.includes("INVALID")) {
+          setOperationFeedback(`Aborted by ESP32: ${statusStr}`, "error");
+          pendingOperation = null;
+          const syncBadge = document.getElementById("pendingSyncBadge");
+          if (syncBadge) {
+            syncBadge.textContent = "ABORTED";
+            syncBadge.className = "cat-badge badge-coral !h-[18px] !text-[9px]";
+          }
+          renderRackMatrix();
+        } else if (
+          statusStr.includes("CYCLE COMPLETE") ||
+          (pendingOperation.sawRunning && !esp32Running && Number(data.step_stage) === 0)
+        ) {
+          commitPendingOperationOnHardwareConfirm();
+        }
+      }
+
+      // 2. Hardware Confirmation Check for Individual Slot Test Move & Return Home
+      if (currentTestMoveState === "Moving to Target") {
+        const targetC = BOX_COORDINATES[selectedBox];
+        if (esp32Locked) {
+          setSlotTestStatus("Error");
+        } else if (
+          statusStr.includes("TARGET REACHED") ||
+          (!esp32Running && targetC && Math.abs(m1RevVal - targetC.x) < 0.05 && Math.abs(m2RevVal - targetC.z) < 0.05)
+        ) {
+          setSlotTestStatus("Target Reached");
+        }
+      } else if (currentTestMoveState === "Returning Home") {
+        if (esp32Locked) {
+          setSlotTestStatus("Error");
+        } else if (
+          (statusStr.includes("HOME") && !esp32Running) ||
+          (!esp32Running && Math.abs(m1RevVal) < 0.03 && Math.abs(m2RevVal) < 0.03)
+        ) {
+          setSlotTestStatus("Home Reached");
+        }
+      }
+
+      // 3. Push live Firebase telemetry directly into the 3D CAD Digital Twin
+      if (asrsTwin && (!cadSimActive || esp32Running || esp32Locked || Number(data.step_stage) > 0)) {
+        cadSimActive = false;
+        const simBtn = document.getElementById("cadSimBtn");
+        if (simBtn) simBtn.classList.remove("active");
+        asrsTwin.updateFromTelemetry(data, BOX_OCCUPANCY, BOX_COORDINATES);
+      }
+
+      renderRackMatrix();
+    }
+
+    // Real-time Firebase RTDB SSE Stream (<50ms latency when ESP32 updates /asrs/telemetry)
+    function startRealtimeTelemetryStream() {
+      if (typeof EventSource === "undefined") return;
+      try {
+        if (telemetryEventSource) telemetryEventSource.close();
+        const streamUrl = `${FIREBASE_HOST}/asrs/telemetry.json?auth=${FIREBASE_AUTH}`;
+        telemetryEventSource = new EventSource(streamUrl);
+
+        telemetryEventSource.onopen = () => {
+          telemetryStreamConnected = true;
+        };
+
+        const handleSsePayload = (ev, isPatch) => {
+          try {
+            const msg = JSON.parse(ev.data);
+            if (!msg || msg.path === undefined) return;
+            telemetryStreamConnected = true;
+            if (msg.path === "/") {
+              if (isPatch && msg.data && typeof msg.data === "object") {
+                liveTelemetryCache = Object.assign({}, liveTelemetryCache, msg.data);
+              } else if (msg.data && typeof msg.data === "object") {
+                liveTelemetryCache = Object.assign({}, msg.data);
+              }
+            } else {
+              const key = msg.path.replace(/^\//, "").split("/")[0];
+              if (key) {
+                liveTelemetryCache = Object.assign({}, liveTelemetryCache, { [key]: msg.data });
+              }
+            }
+            applyTelemetryPayload(liveTelemetryCache);
+          } catch (err) {}
+        };
+
+        telemetryEventSource.addEventListener("put", (ev) => handleSsePayload(ev, false));
+        telemetryEventSource.addEventListener("patch", (ev) => handleSsePayload(ev, true));
+
+        telemetryEventSource.onerror = () => {
+          telemetryStreamConnected = false;
+        };
+      } catch (e) {
+        telemetryStreamConnected = false;
+      }
+    }
+
+    // Poll ESP32 Telemetry (/asrs/telemetry) as initial load & fast fallback when SSE is inactive
     async function fetchTelemetry() {
       try {
         const url = `${FIREBASE_HOST}/asrs/telemetry.json?auth=${FIREBASE_AUTH}`;
         const response = await fetch(url);
         if (!response.ok) throw new Error("Offline");
         const data = await response.json();
-
-        esp32Online = true;
-        const dot = document.getElementById("connDot");
-        const connText = document.getElementById("connStateText");
-        dot.className = "w-2 h-2 rounded-full bg-[#AFFF00]";
-        if (connText) connText.textContent = "ONLINE";
-
-        if (data) {
-          const statusStr = String(data.status || "ONLINE").toUpperCase();
-          esp32Running = !!data.running;
-          esp32Locked = !!data.locked;
-
-          const badge = document.getElementById("systemStatusBadge");
-          badge.textContent = statusStr;
-          badge.className = esp32Locked
-            ? "cat-badge badge-coral !h-[20px] !min-w-[54px] !text-[10px]"
-            : esp32Running
-              ? "cat-badge badge-yellow !h-[20px] !min-w-[54px] !text-[10px]"
-              : "cat-badge badge-mint !h-[20px] !min-w-[54px] !text-[10px]";
-
-          const lockBadge = document.getElementById("lockStateBadge");
-          if (lockBadge) {
-            lockBadge.textContent = esp32Locked ? "LOCKED" : "UNLOCKED";
-            lockBadge.className = esp32Locked ? "cat-badge badge-coral" : "cat-badge badge-mint";
-          }
-
-          const m1RevVal = Number(data.m1_rev || 0);
-          const m2RevVal = Number(data.m2_rev || 0);
-          document.getElementById("m1Rev").textContent = m1RevVal.toFixed(2);
-          document.getElementById("m2Rev").textContent = m2RevVal.toFixed(2);
-          document.getElementById("m1Steps").textContent = data.m1_steps || 0;
-          document.getElementById("m2Steps").textContent = data.m2_steps || 0;
-
-          if (data.servo_state !== undefined) {
-            const svBadge = document.getElementById("servoStateBadge");
-            svBadge.textContent = data.servo_state;
-            svBadge.className = data.servo_state === "STOP"
-              ? "cat-badge badge-muted"
-              : "cat-badge badge-yellow";
-          }
-          if (data.box !== undefined) {
-            document.getElementById("activeBoxBadge").textContent =
-              data.op && data.op !== "NONE" ? `${data.box} (${data.op})` : data.box;
-          }
-          if (data.step_stage !== undefined) {
-            document.getElementById("cycleStagePill").textContent =
-              data.step_stage > 0 ? `STEP ${data.step_stage} / 6` : statusStr;
-            updateSequenceStepHighlight(data.step_stage);
-          }
-          if (data.rpm !== undefined || data.accel !== undefined) {
-            updateGaugesUI(data.rpm, data.accel);
-          }
-          if (data.servo_ext_rev !== undefined) {
-            document.getElementById("liveServoExtRev").textContent = Number(data.servo_ext_rev).toFixed(2);
-          }
-          if (data.servo_ret_rev !== undefined) {
-            document.getElementById("liveServoRetRev").textContent = Number(data.servo_ret_rev).toFixed(2);
-          }
-          if (data.z_offset !== undefined && !isNaN(parseFloat(data.z_offset))) {
-            zLiftOffsetRev = parseFloat(data.z_offset);
-            updateZOffsetReadouts();
-          }
-
-          // 1. Hardware Confirmation Check for Pending STORE / RETRIEVE Operations
-          if (pendingOperation) {
-            if (esp32Running || Number(data.step_stage) > 0) {
-              pendingOperation.sawRunning = true;
-            }
-            if (esp32Locked || statusStr.includes("STOP") || statusStr.includes("REJECTED") || statusStr.includes("INVALID")) {
-              setOperationFeedback(`Aborted by ESP32: ${statusStr}`, "error");
-              pendingOperation = null;
-              const syncBadge = document.getElementById("pendingSyncBadge");
-              if (syncBadge) {
-                syncBadge.textContent = "ABORTED";
-                syncBadge.className = "cat-badge badge-coral !h-[18px] !text-[9px]";
-              }
-              renderRackMatrix();
-            } else if (
-              statusStr.includes("CYCLE COMPLETE") ||
-              (pendingOperation.sawRunning && !esp32Running && Number(data.step_stage) === 0)
-            ) {
-              commitPendingOperationOnHardwareConfirm();
-            }
-          }
-
-          // 2. Hardware Confirmation Check for Individual Slot Test Move & Return Home
-          if (currentTestMoveState === "Moving to Target") {
-            const targetC = BOX_COORDINATES[selectedBox];
-            if (esp32Locked) {
-              setSlotTestStatus("Error");
-            } else if (
-              statusStr.includes("TARGET REACHED") ||
-              (!esp32Running && targetC && Math.abs(m1RevVal - targetC.x) < 0.05 && Math.abs(m2RevVal - targetC.z) < 0.05)
-            ) {
-              setSlotTestStatus("Target Reached");
-            }
-          } else if (currentTestMoveState === "Returning Home") {
-            if (esp32Locked) {
-              setSlotTestStatus("Error");
-            } else if (
-              (statusStr.includes("HOME") && !esp32Running) ||
-              (!esp32Running && Math.abs(m1RevVal) < 0.03 && Math.abs(m2RevVal) < 0.03)
-            ) {
-              setSlotTestStatus("Home Reached");
-            }
-          }
-
-          // 3. Push live Firebase telemetry directly into the 3D CAD Digital Twin
-          if (asrsTwin && (!cadSimActive || esp32Running || esp32Locked)) {
-            cadSimActive = false;
-            const simBtn = document.getElementById("cadSimBtn");
-            if (simBtn) simBtn.classList.remove("active");
-            asrsTwin.updateFromTelemetry(data, BOX_OCCUPANCY, BOX_COORDINATES);
-          }
-
-          renderRackMatrix();
+        if (data && typeof data === "object") {
+          liveTelemetryCache = Object.assign({}, data);
+          applyTelemetryPayload(liveTelemetryCache);
         }
       } catch (e) {
         esp32Online = false;
@@ -2578,7 +2643,12 @@
     renderRackMatrix();
     fetchInventoryFromFirebase();
     fetchTelemetry();
-    setInterval(fetchTelemetry, 1000);
+    startRealtimeTelemetryStream();
+    // Fast 450ms HTTP fallback when SSE isn't active + 3s reconciliation heartbeat
+    setInterval(() => {
+      if (!telemetryStreamConnected) fetchTelemetry();
+    }, 450);
+    setInterval(fetchTelemetry, 3000);
   </script>
 </body>
 </html>
