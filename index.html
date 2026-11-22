@@ -345,6 +345,82 @@
       border-color: #5C646C;
     }
 
+    /* Integrated 3D CAD Digital Twin + Rack Matrix Workspace */
+    .cad-workspace-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+      flex: 1 1 0%;
+      min-height: 0;
+    }
+    @media (min-width: 768px) {
+      .cad-workspace-grid.mode-split {
+        grid-template-columns: minmax(280px, 46%) minmax(0, 54%);
+      }
+    }
+    .cad-workspace-grid.mode-3d #rackMatrixPane {
+      display: none;
+    }
+    .cad-workspace-grid.mode-matrix #cadTwinPane {
+      display: none;
+    }
+    .cad-workspace-grid.mode-split .rack-slot-cell {
+      padding: 6px 8px;
+      min-height: 54px;
+    }
+
+    .cad-twin-pane {
+      position: relative;
+      background: #DFDFDF;
+      border-radius: 12px;
+      border: 1.5px solid rgba(255, 255, 255, 0.92);
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+      overflow: hidden;
+      min-height: 270px;
+      display: flex;
+      flex-direction: column;
+    }
+    .cad-twin-pane canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      flex: 1 1 0%;
+    }
+    .cad-mini-controls {
+      position: absolute;
+      right: 10px;
+      bottom: 38px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      z-index: 5;
+    }
+    .cad-mini-btn {
+      height: 22px;
+      padding: 0 7px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.82);
+      color: #E2E8F0;
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      font-size: 10px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+    }
+    .cad-mini-btn:hover {
+      background: rgba(15, 23, 42, 0.96);
+      color: #FFFFFF;
+      border-color: rgba(255, 255, 255, 0.45);
+    }
+    .cad-mini-btn.active {
+      background: #AFFF00;
+      color: #000000;
+      border-color: #84CC16;
+    }
+
     /* Custom Scrollbar */
     ::-webkit-scrollbar {
       width: 4px;
@@ -436,27 +512,42 @@
       <!-- ================================================================= -->
       <div class="lg:col-span-7 flex flex-col gap-2.5 lg:min-h-0">
 
-        <!-- PANEL 1: RACK MATRIX (A1-C3) -->
+        <!-- PANEL 1: 3D DIGITAL TWIN & RACK MATRIX (A1-C3) -->
         <section class="schematic-canvas p-3.5 flex-1 flex flex-col justify-between lg:min-h-0">
-          <!-- Header & Single Segmented Mode Toggle (Manual | Auto FIFO) -->
+          <!-- Header, View Switcher (Split | 3D Twin | Matrix) & Allocation Mode (Manual | Auto FIFO) -->
           <div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
-            <div class="flex items-center gap-2.5">
-              <h2 class="text-[16px] font-bold text-black leading-none">Rack Matrix (A1–C3)</h2>
-              <span class="white-pill h-[26px] px-2.5 rounded-full inline-flex items-center gap-1.5 text-[11px]">
+            <div class="flex items-center gap-2">
+              <h2 class="text-[15px] font-bold text-black leading-none">3D Twin &amp; Rack Matrix</h2>
+              <span class="white-pill h-[24px] px-2 rounded-full inline-flex items-center gap-1.5 text-[11px]">
                 <span class="text-[#7A828A]">Occupied</span>
                 <strong id="occupiedCountBadge" class="mono text-black">0 / 9</strong>
               </span>
             </div>
 
-            <!-- Single Segmented Mode Toggle (Only Place for Manual vs Auto FIFO) -->
-            <div class="glass-pill p-0.5 rounded-[8px] flex items-center gap-0.5" role="group" aria-label="Allocation Mode">
-              <button id="modeBtn-MANUAL" onclick="setAllocationMode('MANUAL')" class="mode-pill-btn active-mode">
-                <span>Manual</span>
-              </button>
-              <button id="modeBtn-AUTO" onclick="setAllocationMode('AUTO')" class="mode-pill-btn inactive-mode">
-                <span class="w-1.5 h-1.5 rounded-full bg-[#52C41A]"></span>
-                <span>Auto FIFO</span>
-              </button>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <!-- Visual View Switcher (Split | 3D Twin | Matrix) -->
+              <div class="glass-pill p-0.5 rounded-[8px] flex items-center gap-0.5" role="group" aria-label="Rack View Mode">
+                <button id="vizBtn-split" onclick="setRackVisualMode('split')" class="mode-pill-btn active-mode !h-[28px] !px-2.5 !text-[11px]">
+                  <span>Split</span>
+                </button>
+                <button id="vizBtn-3d" onclick="setRackVisualMode('3d')" class="mode-pill-btn inactive-mode !h-[28px] !px-2.5 !text-[11px]">
+                  <span>3D Twin</span>
+                </button>
+                <button id="vizBtn-matrix" onclick="setRackVisualMode('matrix')" class="mode-pill-btn inactive-mode !h-[28px] !px-2.5 !text-[11px]">
+                  <span>Matrix</span>
+                </button>
+              </div>
+
+              <!-- Single Segmented Mode Toggle (Manual vs Auto FIFO) -->
+              <div class="glass-pill p-0.5 rounded-[8px] flex items-center gap-0.5" role="group" aria-label="Allocation Mode">
+                <button id="modeBtn-MANUAL" onclick="setAllocationMode('MANUAL')" class="mode-pill-btn active-mode !h-[28px] !px-2.5 !text-[11px]">
+                  <span>Manual</span>
+                </button>
+                <button id="modeBtn-AUTO" onclick="setAllocationMode('AUTO')" class="mode-pill-btn inactive-mode !h-[28px] !px-2.5 !text-[11px]">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#52C41A]"></span>
+                  <span>Auto FIFO</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -466,56 +557,70 @@
             <span class="mono text-[10px] bg-black/25 px-1.5 py-0.5 rounded">FULL</span>
           </div>
 
-          <!-- 3x3 Rack Matrix Grid (Clean Slot ID, Status & Product Name/SKU — No X/Z Coords) -->
-          <div class="my-2 bg-white/55 backdrop-blur-md rounded-[12px] p-3 border border-white/80 flex-1 flex flex-col justify-between lg:min-h-0">
-            <!-- Compact Legend -->
-            <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#5C646C] mb-2 shrink-0">
-              <span id="matrixInstructionText" class="font-medium text-[#1E2022]">
-                Select any slot to inspect, store, or retrieve
-              </span>
-              <div class="flex items-center gap-3">
-                <span class="inline-flex items-center gap-1 font-medium text-black">
-                  <span class="w-2.5 h-2.5 rounded-[3px] bg-[#FFBC5B] border border-black"></span> Target
-                </span>
-                <span class="inline-flex items-center gap-1 font-medium text-black">
-                  <span class="w-2.5 h-2.5 rounded-[3px] bg-[#A6E9FF]"></span> Occupied
-                </span>
-                <span class="inline-flex items-center gap-1 font-medium text-[#5C646C]">
-                  <span class="w-2.5 h-2.5 rounded-[3px] bg-[#D8DCE0]"></span> Empty
-                </span>
+          <!-- Split Workspace: Left 3D CAD Animation + Right 3x3 Rack Matrix -->
+          <div id="rackVisualWorkspace" class="cad-workspace-grid mode-split my-2">
+            <!-- LEFT PANE: LIVE 2.5D PHOTOREALISTIC CAD DIGITAL TWIN -->
+            <div id="cadTwinPane" class="cad-twin-pane">
+              <canvas id="asrsCadCanvas" aria-label="IND-02 ASRS 3D Digital Twin Animation"></canvas>
+              <div class="cad-mini-controls mono">
+                <button id="cadLabelsBtn" type="button" onclick="toggleCadBayLabels()" class="cad-mini-btn"
+                  title="Toggle A1–C3 bay labels on 3D rack">Labels</button>
+                <button id="cadSimBtn" type="button" onclick="previewCadDemoCycle()" class="cad-mini-btn"
+                  title="Preview animated cycle on selected slot (offline safe)">Sim</button>
               </div>
             </div>
 
-            <!-- 3x3 Grid with Row Labels -->
-            <div class="grid grid-cols-12 gap-2 flex-1 items-stretch lg:min-h-0">
-              <div class="col-span-2 flex flex-col justify-between gap-2 text-[11px] mono text-[#5C646C]">
-                <div class="flex-1 flex flex-col justify-center bg-white/70 rounded-[8px] px-2 border border-white">
-                  <span class="font-bold text-black">ROW C</span>
-                  <span class="text-[10px]">Top</span>
-                </div>
-                <div class="flex-1 flex flex-col justify-center bg-white/70 rounded-[8px] px-2 border border-white">
-                  <span class="font-bold text-black">ROW B</span>
-                  <span class="text-[10px]">Mid</span>
-                </div>
-                <div class="flex-1 flex flex-col justify-center bg-white/70 rounded-[8px] px-2 border border-white">
-                  <span class="font-bold text-black">ROW A</span>
-                  <span class="text-[10px]">Low</span>
+            <!-- RIGHT PANE: 3x3 RACK MATRIX GRID (Clean Slot ID, Status & Product Name/SKU) -->
+            <div id="rackMatrixPane" class="bg-white/55 backdrop-blur-md rounded-[12px] p-2.5 border border-white/80 flex-1 flex flex-col justify-between lg:min-h-0">
+              <!-- Compact Legend -->
+              <div class="flex flex-wrap items-center justify-between gap-1.5 text-[10.5px] text-[#5C646C] mb-1.5 shrink-0">
+                <span id="matrixInstructionText" class="font-medium text-[#1E2022] truncate">
+                  Click any slot or 3D bay to select
+                </span>
+                <div class="flex items-center gap-2.5 shrink-0">
+                  <span class="inline-flex items-center gap-1 font-medium text-black">
+                    <span class="w-2.5 h-2.5 rounded-[3px] bg-[#FFBC5B] border border-black"></span> Target
+                  </span>
+                  <span class="inline-flex items-center gap-1 font-medium text-black">
+                    <span class="w-2.5 h-2.5 rounded-[3px] bg-[#A6E9FF]"></span> Occupied
+                  </span>
+                  <span class="inline-flex items-center gap-1 font-medium text-[#5C646C]">
+                    <span class="w-2.5 h-2.5 rounded-[3px] bg-[#D8DCE0]"></span> Empty
+                  </span>
                 </div>
               </div>
 
-              <div class="col-span-10 grid grid-cols-3 grid-rows-3 gap-2 flex-1 lg:min-h-0">
-                <!-- Row C -->
-                <button onclick="onUserClickSlot('C1')" id="boxBtn-C1" class="rack-slot-cell text-left"></button>
-                <button onclick="onUserClickSlot('C2')" id="boxBtn-C2" class="rack-slot-cell text-left"></button>
-                <button onclick="onUserClickSlot('C3')" id="boxBtn-C3" class="rack-slot-cell text-left"></button>
-                <!-- Row B -->
-                <button onclick="onUserClickSlot('B1')" id="boxBtn-B1" class="rack-slot-cell text-left"></button>
-                <button onclick="onUserClickSlot('B2')" id="boxBtn-B2" class="rack-slot-cell text-left"></button>
-                <button onclick="onUserClickSlot('B3')" id="boxBtn-B3" class="rack-slot-cell text-left"></button>
-                <!-- Row A -->
-                <button onclick="onUserClickSlot('A1')" id="boxBtn-A1" class="rack-slot-cell text-left"></button>
-                <button onclick="onUserClickSlot('A2')" id="boxBtn-A2" class="rack-slot-cell text-left"></button>
-                <button onclick="onUserClickSlot('A3')" id="boxBtn-A3" class="rack-slot-cell text-left"></button>
+              <!-- 3x3 Grid with Row Labels -->
+              <div class="grid grid-cols-12 gap-1.5 flex-1 items-stretch lg:min-h-0">
+                <div class="col-span-2 flex flex-col justify-between gap-1.5 text-[10px] mono text-[#5C646C]">
+                  <div class="flex-1 flex flex-col justify-center bg-white/70 rounded-[8px] px-1.5 border border-white">
+                    <span class="font-bold text-black">ROW C</span>
+                    <span class="text-[9.5px]">Top</span>
+                  </div>
+                  <div class="flex-1 flex flex-col justify-center bg-white/70 rounded-[8px] px-1.5 border border-white">
+                    <span class="font-bold text-black">ROW B</span>
+                    <span class="text-[9.5px]">Mid</span>
+                  </div>
+                  <div class="flex-1 flex flex-col justify-center bg-white/70 rounded-[8px] px-1.5 border border-white">
+                    <span class="font-bold text-black">ROW A</span>
+                    <span class="text-[9.5px]">Low</span>
+                  </div>
+                </div>
+
+                <div class="col-span-10 grid grid-cols-3 grid-rows-3 gap-1.5 flex-1 lg:min-h-0">
+                  <!-- Row C -->
+                  <button onclick="onUserClickSlot('C1')" id="boxBtn-C1" class="rack-slot-cell text-left"></button>
+                  <button onclick="onUserClickSlot('C2')" id="boxBtn-C2" class="rack-slot-cell text-left"></button>
+                  <button onclick="onUserClickSlot('C3')" id="boxBtn-C3" class="rack-slot-cell text-left"></button>
+                  <!-- Row B -->
+                  <button onclick="onUserClickSlot('B1')" id="boxBtn-B1" class="rack-slot-cell text-left"></button>
+                  <button onclick="onUserClickSlot('B2')" id="boxBtn-B2" class="rack-slot-cell text-left"></button>
+                  <button onclick="onUserClickSlot('B3')" id="boxBtn-B3" class="rack-slot-cell text-left"></button>
+                  <!-- Row A -->
+                  <button onclick="onUserClickSlot('A1')" id="boxBtn-A1" class="rack-slot-cell text-left"></button>
+                  <button onclick="onUserClickSlot('A2')" id="boxBtn-A2" class="rack-slot-cell text-left"></button>
+                  <button onclick="onUserClickSlot('A3')" id="boxBtn-A3" class="rack-slot-cell text-left"></button>
+                </div>
               </div>
             </div>
           </div>
@@ -1197,12 +1302,24 @@
   </div>
 
   <!-- ======================================================================= -->
+  <!-- 2.5D PHOTOREALISTIC CAD DIGITAL TWIN ENGINE                             -->
+  <!-- ======================================================================= -->
+  <script src="./asrs_cad_widget/asrs-cad-twin.js"></script>
+
+  <!-- ======================================================================= -->
   <!-- APPLICATION LOGIC, FIFO AUTO-ALLOCATION & FIREBASE CONFIG PERSISTENCE   -->
   <!-- ======================================================================= -->
   <script>
     // Firebase Configuration matching ESP32 Firmware Credentials
     const FIREBASE_HOST = "https://pp-ind02-default-rtdb.asia-southeast1.firebasedatabase.app";
     const FIREBASE_AUTH = "nryzRKE5yCmDJqwdPtMOHDKV8EKbdTAraTgQQvC3";
+
+    // 3D CAD Digital Twin Asset Path & Instance
+    const CAD_ASSET_PATH = "./asrs_cad_widget/assets/";
+    let asrsTwin = null;
+    let cadVisualMode = "split"; // "split" | "3d" | "matrix"
+    let cadBayLabelsOn = false;
+    let cadSimActive = false;
 
     // Strict FIFO Priority Sequence for AUTO MODE
     const FIFO_SLOT_PRIORITY = ["A1", "A2", "A3", "B1", "B2", "B3", "C1", "C2", "C3"];
@@ -1563,6 +1680,8 @@
           `;
         }).join("");
       }
+
+      syncCadTwinState();
     }
 
     function setOperationFeedback(msg, type = "info") {
@@ -1931,6 +2050,7 @@
         setTab.setAttribute("aria-selected", "false");
         opPanel.classList.remove("hidden");
         setPanel.classList.add("hidden");
+        if (asrsTwin) requestAnimationFrame(() => asrsTwin.resize());
       } else {
         opTab.setAttribute("aria-selected", "false");
         setTab.setAttribute("aria-selected", "true");
@@ -2313,31 +2433,10 @@
 
           // 1. Hardware Confirmation Check for Pending STORE / RETRIEVE Operations
           if (pendingOperation) {
-            const elapsedMs = Date.now() - pendingOperation.dispatchedAt;
-
-            // Mark as actively running only when ESP32 enters the ASRS sequence for our target box
-            if (
-              (esp32Running && Number(data.step_stage) > 0) ||
-              statusStr.includes("STEP 3") ||
-              statusStr.includes("STEP 4") ||
-              statusStr.includes("STEP 5") ||
-              statusStr.includes("STEP 6")
-            ) {
+            if (esp32Running || Number(data.step_stage) > 0) {
               pendingOperation.sawRunning = true;
             }
-
-            // Only treat as an explicit abort if:
-            // - System is locked (E-STOP), OR
-            // - After a 1200ms poll grace period, ESP32 reports an explicit rejection/error/manual stop
-            //   (specifically excluding "SERVO TARGET REV REACHED (STOP)" which is a normal servo completion message)
-            const isExplicitAbortStatus =
-              statusStr === "STOPPED" ||
-              statusStr.startsWith("EMERGENCY") ||
-              statusStr.startsWith("REJECTED") ||
-              statusStr.startsWith("INVALID") ||
-              (pendingOperation.sawRunning && statusStr === "STOPPED");
-
-            if (esp32Locked || (elapsedMs > 1200 && isExplicitAbortStatus)) {
+            if (esp32Locked || statusStr.includes("STOP") || statusStr.includes("REJECTED") || statusStr.includes("INVALID")) {
               setOperationFeedback(`Aborted by ESP32: ${statusStr}`, "error");
               pendingOperation = null;
               const syncBadge = document.getElementById("pendingSyncBadge");
@@ -2347,7 +2446,7 @@
               }
               renderRackMatrix();
             } else if (
-              (pendingOperation.sawRunning && statusStr.includes("CYCLE COMPLETE")) ||
+              statusStr.includes("CYCLE COMPLETE") ||
               (pendingOperation.sawRunning && !esp32Running && Number(data.step_stage) === 0)
             ) {
               commitPendingOperationOnHardwareConfirm();
@@ -2376,6 +2475,14 @@
             }
           }
 
+          // 3. Push live Firebase telemetry directly into the 3D CAD Digital Twin
+          if (asrsTwin && (!cadSimActive || esp32Running || esp32Locked)) {
+            cadSimActive = false;
+            const simBtn = document.getElementById("cadSimBtn");
+            if (simBtn) simBtn.classList.remove("active");
+            asrsTwin.updateFromTelemetry(data, BOX_OCCUPANCY, BOX_COORDINATES);
+          }
+
           renderRackMatrix();
         }
       } catch (e) {
@@ -2386,7 +2493,88 @@
       }
     }
 
+    // =========================================================================
+    // 3D CAD DIGITAL TWIN INITIALIZATION & VIEW CONTROLS
+    // =========================================================================
+    function initCadDigitalTwin() {
+      const canvasEl = document.getElementById("asrsCadCanvas");
+      if (!canvasEl || typeof AsrsCadTwin === "undefined") return;
+
+      asrsTwin = new AsrsCadTwin({
+        canvas: canvasEl,
+        assetPath: CAD_ASSET_PATH,
+        cropMode: "compact",
+        showTopChips: true,
+        showLegend: true,
+        showBayLabels: cadBayLabelsOn,
+        enableClickToSelect: true,
+        initialOccupancy: BOX_OCCUPANCY,
+        coordinates: BOX_COORDINATES,
+        onBayClick: (bayId) => onUserClickSlot(bayId)
+      });
+      syncCadTwinState();
+    }
+
+    function syncCadTwinState() {
+      if (!asrsTwin) return;
+      if (!cadSimActive) {
+        asrsTwin.setOccupancy(BOX_OCCUPANCY);
+      }
+      asrsTwin.setCoordinates(BOX_COORDINATES);
+      asrsTwin.setSelectedBay(selectedBox);
+    }
+
+    function setRackVisualMode(mode) {
+      if (!["split", "3d", "matrix"].includes(mode)) return;
+      cadVisualMode = mode;
+      const ws = document.getElementById("rackVisualWorkspace");
+      if (ws) {
+        ws.classList.remove("mode-split", "mode-3d", "mode-matrix");
+        ws.classList.add(`mode-${mode}`);
+      }
+      ["split", "3d", "matrix"].forEach((m) => {
+        const btn = document.getElementById(`vizBtn-${m}`);
+        if (!btn) return;
+        btn.className = `mode-pill-btn ${m === mode ? "active-mode" : "inactive-mode"} !h-[28px] !px-2.5 !text-[11px]`;
+      });
+      if (asrsTwin && mode !== "matrix") {
+        asrsTwin.setOption("cropMode", mode === "3d" ? "wide" : "compact");
+        requestAnimationFrame(() => asrsTwin.resize());
+      }
+    }
+
+    function toggleCadBayLabels() {
+      cadBayLabelsOn = !cadBayLabelsOn;
+      const btn = document.getElementById("cadLabelsBtn");
+      if (btn) btn.classList.toggle("active", cadBayLabelsOn);
+      if (asrsTwin) asrsTwin.setOption("showBayLabels", cadBayLabelsOn);
+    }
+
+    function previewCadDemoCycle() {
+      if (!asrsTwin) return;
+      if (esp32Running || pendingOperation) {
+        setOperationFeedback("Live ESP32 cycle in progress — 3D Twin is tracking real hardware.", "info");
+        return;
+      }
+      const target = selectedBox || "C2";
+      const opType = BOX_OCCUPANCY[target] ? "RETRIEVAL" : "STORAGE";
+      cadSimActive = true;
+      const simBtn = document.getElementById("cadSimBtn");
+      if (simBtn) simBtn.classList.add("active");
+      asrsTwin.setOccupancy(BOX_OCCUPANCY);
+      asrsTwin.runDemoCycle(opType, target, {
+        rpm: 60,
+        duration: 8.5,
+        onComplete: () => {
+          cadSimActive = false;
+          if (simBtn) simBtn.classList.remove("active");
+          syncCadTwinState();
+        }
+      });
+    }
+
     loadLocalPersistence();
+    initCadDigitalTwin();
     renderRackMatrix();
     fetchInventoryFromFirebase();
     fetchTelemetry();
