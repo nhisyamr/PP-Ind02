@@ -3,29 +3,20 @@
  * Proyek Perancangan IND-02 — ASRS 2.5D Photorealistic CAD Digital Twin Engine
  * =============================================================================
  * Self-contained, zero-dependency HTML5 Canvas 2D renderer + kinematic engine
- * designed to drop directly into `asrs_wms_dashboard_(5).html` (or any WMS).
+ * designed to track REAL ESP32 / Firebase RTDB hardware motion in real time
+ * (and also support offline preview cycles).
  *
  * Key Capabilities:
  *  - Dynamic 9-bay (A1–C3) stock rendering over an all-empty studio CAD backdrop
- *  - Watertight 14-stage Painter's Algorithm with 3D shelf, divider & frame occlusion
- *  - Exact 1200x896 pixel-locked 2.5D kinematics matching ESP32 firmware:
- *      * Motor 1 (X-Axis, GPIO 14/27): 200 st/rev, belt-driven horizontal gantry
- *      * Motor 2 (Z-Axis, GPIO 26/25): 200 st/rev, vertical lift + dynamic drag chain
- *      * 360° Continuous Servo (GPIO 32): 50Hz 14-bit PWM (1000/1500/2000 us) fork
- *      * Z Lift / Drop Clearance Offset: ±0.40 rev (configurable via telemetry)
- *  - Smooth 60 FPS telemetry interpolation + optional dead-reckoning between
- *    1000 ms Firebase RTDB polls (`updateFromTelemetry()`)
- *  - Built-in AccelStepper trapezoidal demo simulator (`runDemoCycle()`,
- *    `runHomingDemo()`, `triggerEStop()`, `unlock()`)
- *  - Interactive 3D bay hit-testing (`onBayClick(bayId)` hooks to `onUserClickSlot`)
- *
- * Usage:
- *   const twin = new AsrsCadTwin({
- *     canvas: '#asrsCadCanvas',
- *     assetPath: './assets/',
- *     onBayClick: (bayId) => onUserClickSlot(bayId)
- *   });
- *   twin.updateFromTelemetry(telemetryJson, BOX_OCCUPANCY, BOX_COORDINATES);
+ *  - True isometric Column-by-Column x Row-by-Row Painter's Algorithm
+ *    (Col 1 -> Wall 1 -> Col 2 -> Wall 2 -> Col 3 -> Right Frame) with
+ *    zero wall-slicing, zero ceiling-chopping, and zero fork-piercing artifacts
+ *  - Per-bay calibrated coordinate normalization (works cleanly even when
+ *    individual slots have custom X/Z revolutions like A1=0.2, A2=1.0, z_offset=0.1)
+ *  - Stage-aware live ESP32/Firebase telemetry tracking (`updateFromTelemetry()`)
+ *    + immediate command dispatch tracking (`notifyCommand()`) so the 3D twin
+ *    moves continuously and smoothly whenever the real ASRS moves
+ *  - Interactive 3D bay hit-testing (`onBayClick(bayId)`)
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -42,10 +33,14 @@
   const NATIVE_W = 1200;
   const NATIVE_H = 896;
 
+  // Visual Z clearance lift inside a cubby (~9.2px on screen so box never clips
+  // into the solid shelf floor above it — ~5px visible headroom on all 9 bays!)
+  const VISUAL_LIFT_REV = 0.135;
+
   // Crop viewports inside the 1200x896 studio render
   const CROP_MODES = {
-    compact: { x: 142, y: 14, w: 868, h: 882 }, // Matches the left CAD card in asrs_ind02_animation.gif
-    wide:    { x: 40,  y: 12, w: 1120, h: 874 } // Full studio frame with generous side margins
+    compact: { x: 142, y: 14, w: 868, h: 882 },
+    wide:    { x: 40,  y: 12, w: 1120, h: 874 }
   };
 
   // All 16 pixel-locked PNG assets relative to `assetPath`
@@ -69,36 +64,41 @@
   };
 
   // Native 1200x896 calibration per bay (A1..C3)
-  // Default firmware coordinates: Col 1/2/3 -> X = 2.0/5.0/8.0 rev; Row A/B/C -> Z = 1.5/4.0/6.5 rev
+  // Canonical visual coordinates: Col 1/2/3 -> 2.0/5.0/8.0, Row A/B/C seated -> 1.10/3.60/6.10
   const BAY_INFO = {
-    A1: { id: 'A1', row: 'A', col: 1, xRev: 2.0, zRev: 1.5, boxRest: { x: 363, y: 500 }, quad: [[338,444],[456,496],[456,664],[338,605]], labelPos: [396,472] },
-    A2: { id: 'A2', row: 'A', col: 2, xRev: 5.0, zRev: 1.5, boxRest: { x: 486, y: 556 }, quad: [[462,498],[578,550],[578,724],[462,666]], labelPos: [520,528] },
-    A3: { id: 'A3', row: 'A', col: 3, xRev: 8.0, zRev: 1.5, boxRest: { x: 609, y: 612 }, quad: [[584,552],[702,606],[702,786],[584,728]], labelPos: [642,584] },
-    B1: { id: 'B1', row: 'B', col: 1, xRev: 2.0, zRev: 4.0, boxRest: { x: 363, y: 332 }, quad: [[338,278],[456,330],[456,494],[338,442]], labelPos: [396,306] },
-    B2: { id: 'B2', row: 'B', col: 2, xRev: 5.0, zRev: 4.0, boxRest: { x: 486, y: 388 }, quad: [[462,332],[578,384],[578,548],[462,496]], labelPos: [520,360] },
-    B3: { id: 'B3', row: 'B', col: 3, xRev: 8.0, zRev: 4.0, boxRest: { x: 609, y: 444 }, quad: [[584,386],[702,438],[702,604],[584,550]], labelPos: [642,416] },
-    C1: { id: 'C1', row: 'C', col: 1, xRev: 2.0, zRev: 6.5, boxRest: { x: 363, y: 160 }, quad: [[338,112],[456,163],[456,328],[338,276]], labelPos: [396,142] },
-    C2: { id: 'C2', row: 'C', col: 2, xRev: 5.0, zRev: 6.5, boxRest: { x: 486, y: 214 }, quad: [[462,165],[578,214],[578,380],[462,330]], labelPos: [520,192] },
-    C3: { id: 'C3', row: 'C', col: 3, xRev: 8.0, zRev: 6.5, boxRest: { x: 609, y: 270 }, quad: [[584,216],[702,268],[702,436],[584,382]], labelPos: [642,244] }
+    A1: { id: 'A1', row: 'A', col: 1, xRev: 2.0, zRev: 1.5, zSeatVis: 1.10, boxRest: { x: 363, y: 500 }, quad: [[338,444],[456,496],[456,664],[338,605]], labelPos: [396,472] },
+    A2: { id: 'A2', row: 'A', col: 2, xRev: 5.0, zRev: 1.5, zSeatVis: 1.10, boxRest: { x: 486, y: 556 }, quad: [[462,498],[578,550],[578,724],[462,666]], labelPos: [520,528] },
+    A3: { id: 'A3', row: 'A', col: 3, xRev: 8.0, zRev: 1.5, zSeatVis: 1.10, boxRest: { x: 609, y: 612 }, quad: [[584,552],[702,606],[702,786],[584,728]], labelPos: [642,584] },
+    B1: { id: 'B1', row: 'B', col: 1, xRev: 2.0, zRev: 4.0, zSeatVis: 3.60, boxRest: { x: 363, y: 332 }, quad: [[338,278],[456,330],[456,494],[338,442]], labelPos: [396,306] },
+    B2: { id: 'B2', row: 'B', col: 2, xRev: 5.0, zRev: 4.0, zSeatVis: 3.60, boxRest: { x: 486, y: 388 }, quad: [[462,332],[578,384],[578,548],[462,496]], labelPos: [520,360] },
+    B3: { id: 'B3', row: 'B', col: 3, xRev: 8.0, zRev: 4.0, zSeatVis: 3.60, boxRest: { x: 609, y: 444 }, quad: [[584,386],[702,438],[702,604],[584,550]], labelPos: [642,416] },
+    C1: { id: 'C1', row: 'C', col: 1, xRev: 2.0, zRev: 6.5, zSeatVis: 6.10, boxRest: { x: 363, y: 160 }, quad: [[338,112],[456,163],[456,328],[338,276]], labelPos: [396,142] },
+    C2: { id: 'C2', row: 'C', col: 2, xRev: 5.0, zRev: 6.5, zSeatVis: 6.10, boxRest: { x: 486, y: 214 }, quad: [[462,165],[578,214],[578,380],[462,330]], labelPos: [520,192] },
+    C3: { id: 'C3', row: 'C', col: 3, xRev: 8.0, zRev: 6.5, zSeatVis: 6.10, boxRest: { x: 609, y: 270 }, quad: [[584,216],[702,268],[702,436],[584,382]], labelPos: [642,244] }
   };
 
-  const ROW_BAYS = {
-    A: ['A1', 'A2', 'A3'],
-    B: ['B1', 'B2', 'B3'],
-    C: ['C1', 'C2', 'C3']
+  // Column horizontal clip intervals (1200x896 space) for true per-column shelf occlusion
+  const COL_CLIP_X = {
+    1: [326, 463],
+    2: [463, 585],
+    3: [585, 718]
   };
 
   // Seated vertical perspective offset (boxRest.y - beamY) across (row, col)
-  // Guarantees 0.0px handoff jump between carried box and seated shelf box on ALL 9 bays!
+  // Calibrated to exact carriage projection so boxCarry hands off to boxBay with 0.0px jump!
   const PERSP_DY_GRID = [
-    [-96.3, -97.2, -98.0], // Row A seated (zVis = 1.10)
-    [-94.3, -92.9, -91.4], // Row B seated (zVis = 3.60)
-    [-96.3, -94.6, -90.9]  // Row C seated (zVis = 6.10)
+    [-96.3, -97.2, -95.7], // Row A seated (zVis = 1.10)
+    [-94.3, -92.9, -89.2], // Row B seated (zVis = 3.60)
+    [-96.3, -94.6, -88.8]  // Row C seated (zVis = 6.10)
   ];
 
   // Depth unit vector pointing into the rack cubbies (isometric Y-depth axis)
   const DEPTH_UX = 0.889;
   const DEPTH_UY = -0.458;
+
+  // Retracted-to-seated fork travel along isometric depth axis (-22px, +11px when retracted)
+  const FORK_TRAVEL_DX = 22;
+  const FORK_TRAVEL_DY = -11;
 
   // ---------------------------------------------------------------------------
   // 2. MATH & ACCELSTEPPER KINEMATICS HELPERS
@@ -130,45 +130,60 @@
 
   /**
    * Piecewise Z-axis horizontal crossbar endpoints in 1200x896 native CAD space.
-   * Row A seated = 1.10, Row B seated = 3.60, Row C seated = 6.10 (+0.40 lift = 6.50).
+   * Row A seated = 1.10, Row B seated = 3.60, Row C seated = 6.10 (+lift = 6.235).
    */
   function getBeamEndpoints(zVis) {
     const xL = 262;
     const xR = 695;
+    const zc = clamp(zVis, 0, 6.32);
     let yL, yR;
-    if (zVis <= 1.10) {
-      const t = clamp(zVis / 1.10, 0, 1);
+    if (zc <= 1.10) {
+      const t = clamp(zc / 1.10, 0, 1);
       yL = lerp(594, 546, t);
       yR = lerp(796, 746, t);
     } else {
-      const u = clamp((zVis - 1.10) / 5.0, 0, 1.15);
-      yL = 546 - u * 336; // 67.2 px/rev -> Row C seated (6.10): 210, lift (6.50): 183
-      yR = 746 - u * 352; // 70.4 px/rev -> Row C seated (6.10): 394, lift (6.50): 366
+      const u = clamp((zc - 1.10) / 5.0, 0, 1.06);
+      yL = 546 - u * 336; // 67.2 px/rev -> Row C seated (6.10): 210
+      yR = 746 - u * 352; // 70.4 px/rev -> Row C seated (6.10): 394
     }
     return { xL, yL, xR, yR };
   }
 
   /**
    * Piecewise X-axis carriage center along the slanted horizontal beam.
-   * X = 0 -> 320 (clear of left rail), Col 1 (2.0) -> 371, Col 2 (5.0) -> 494, Col 3 (8.0) -> 617.
+   * X = 0 -> 336 (cleanly inside left rail so carried box never clips left extrusion!),
+   * Col 1 (2.0) -> 371, Col 2 (5.0) -> 494, Col 3 (8.0) -> 612 (5px clear of right blue Z-belt!).
    */
   function getCarriagePos(xVis, zVis) {
     const { xL, yL, xR, yR } = getBeamEndpoints(zVis);
-    const xClamped = clamp(xVis, 0, 8.6);
-    const cx = xClamped <= 2.0
-      ? (320 + xClamped * 25.5)
-      : (371 + (xClamped - 2.0) * 41.0);
+    const xClamped = clamp(xVis, 0, 8.2);
+    let cx;
+    if (xClamped <= 2.0) {
+      cx = 336 + xClamped * 17.5;
+    } else if (xClamped <= 5.0) {
+      cx = 371 + (xClamped - 2.0) * 41.0;
+    } else {
+      cx = 494 + (xClamped - 5.0) * 39.333;
+    }
     const u = (cx - xL) / (xR - xL);
     const beamY = yL + u * (yR - yL);
     return { cx, beamY, u, slope: (yR - yL) / (xR - xL) };
   }
 
   /**
+   * Horizontal carriage-to-boxRest offset (-8 at Col 1/2, smoothly -3 at Col 3 where cx=612 -> boxRest=609).
+   */
+  function getCarriedPerspDx(xVis) {
+    if (xVis <= 5.0) return -8.0;
+    return lerp(-8.0, -3.0, clamp((xVis - 5.0) / 3.0, 0, 1));
+  }
+
+  /**
    * Bilinearly interpolated carried-box vertical perspective offset across (xVis, zVis).
    */
   function getCarriedPerspDy(xVis, zVis) {
-    const cPos = clamp((xVis - 2.0) / 3.0, 0, 2); // 0=Col1, 1=Col2, 2=Col3
-    const rPos = clamp((zVis - 1.10) / 2.5, 0, 2); // 0=RowA, 1=RowB, 2=RowC
+    const cPos = clamp((xVis - 2.0) / 3.0, 0, 2);
+    const rPos = clamp((zVis - 1.10) / 2.5, 0, 2);
     const c0 = Math.floor(cPos), c1 = Math.min(2, c0 + 1), tc = cPos - c0;
     const r0 = Math.floor(rPos), r1 = Math.min(2, r0 + 1), tr = rPos - r0;
     const top = lerp(PERSP_DY_GRID[r0][c0], PERSP_DY_GRID[r0][c1], tc);
@@ -176,9 +191,6 @@
     return lerp(top, bot, tr);
   }
 
-  /**
-   * Point-in-polygon ray casting for interactive 3D bay click/hover selection.
-   */
   function pointInQuad(px, py, quad) {
     let inside = false;
     for (let i = 0, j = quad.length - 1; i < quad.length; j = i++) {
@@ -222,7 +234,6 @@
         showBayLabels: !!options.showBayLabels,
         showMotionVectors: options.showMotionVectors !== false,
         showHomeMarker: options.showHomeMarker !== false,
-        predictBetweenPolls: options.predictBetweenPolls !== false,
         enableClickToSelect: options.enableClickToSelect !== false,
         autoStart: options.autoStart !== false,
         onBayClick: typeof options.onBayClick === 'function' ? options.onBayClick : null,
@@ -230,19 +241,18 @@
         onReady: typeof options.onReady === 'function' ? options.onReady : null
       };
 
-      // Normalize trailing slash on assetPath
       if (this.options.assetPath && !this.options.assetPath.endsWith('/')) {
         this.options.assetPath += '/';
       }
 
-      // Dynamic coordinate map (defaults match firmware BOX_X_REV / BOX_Z_REV)
+      // Per-bay calibrated firmware coordinates (synced from WMS BOX_COORDINATES / Firebase)
       this.coordinates = {};
       for (const [id, info] of Object.entries(BAY_INFO)) {
         this.coordinates[id] = { x: info.xRev, z: info.zRev };
       }
       if (options.coordinates) this.setCoordinates(options.coordinates);
 
-      // Dynamic 9-bay occupancy map (false = empty, true = stocked)
+      // Dynamic 9-bay occupancy map
       this.occ = {
         A1: false, A2: false, A3: false,
         B1: false, B2: false, B3: false,
@@ -250,16 +260,21 @@
       };
       if (options.initialOccupancy) this.setOccupancy(options.initialOccupancy);
 
-      // Rendered kinematic & telemetry state
+      // Kinematic & telemetry state
+      // Note: xVis in [0..8.0] and zVis in [0..6.235] are the smooth visual coordinates;
+      // xRev and zRev mirror the live firmware revolution readouts for HUD badges.
       this.state = {
         mode: 'live',          // 'live' | 'demo' | 'manual'
-        xRev: 0.0,             // smoothed rendered X (firmware rev)
-        zRev: 0.0,             // smoothed rendered Z (firmware rev)
-        zVisOverride: null,    // optional direct visual Z override
-        forkExt: 0.0,          // 0 = retracted, 1 = extended into rack
-        targetXRev: 0.0,       // target from latest telemetry
-        targetZRev: 0.0,
-        targetForkExt: 0.0,
+        xRev: 0.0,             // displayed firmware X rev
+        zRev: 0.0,             // displayed firmware Z rev
+        xVis: 0.0,             // rendered visual X [0..8.0]
+        zVis: 0.0,             // rendered visual Z [0..6.235]
+        goalXRev: 0.0,         // live firmware X goal
+        goalZRev: 0.0,         // live firmware Z goal
+        goalXVis: 0.0,         // live visual X goal
+        goalZVis: 0.0,         // live visual Z goal
+        forkExt: 0.0,          // 0 = retracted, 1 = fully extended into bay
+        goalForkExt: 0.0,
         servoState: 'STOP',    // STOP | EXTEND | RETRACT
         servoExtRev: 1.5,
         servoRetRev: 1.5,
@@ -268,37 +283,41 @@
         rpm: 60.0,
         accel: 800.0,
         stepStage: 0,          // 0..6
-        op: 'NONE',            // NONE | STORAGE | RETRIEVAL | HOMING | E-STOP | MANUAL
+        op: 'NONE',            // NONE | STORAGE | RETRIEVAL | HOMING | HOME | TEST | JOG | E-STOP | MANUAL
         targetBay: null,       // active operation bay ('A1'..'C3')
         selectedBay: 'A1',     // WMS selected bay highlight
-        hoveredBay: null,      // pointer hover highlight
+        hoveredBay: null,
         running: false,
         locked: false,
         homingSwitchHit: false,
         carriedBox: false,
-        tempShowShelfBox: null, // bay newly dropped during stage 5..6 before WMS commits occ
-        tempHideShelfBox: null, // bay newly lifted during stage 4..6 before WMS commits occ
+        tempShowShelfBox: null,
+        tempHideShelfBox: null,
         xDir: 0,
         zDir: 0,
         forkDir: 0,
+        jogVelX: 0,            // continuous manual jog velocity (-1, 0, +1)
+        jogVelZ: 0,
         statusMsg: 'STANDBY — AT HOME (0,0)',
         online: false,
         lastTelemetryMs: 0,
-        rtdbPulseUntil: 0
+        rtdbPulseUntil: 0,
+        _rtdbActive: false
       };
 
-      // Active offline demo choreography descriptor (when mode === 'demo')
+      // Remember previous raw ESP32 packet to distinguish real encoder movement
+      // from unchanged start-of-stage snapshots repeated by 1Hz polls!
+      this._lastRaw = null;
+      this._pendingCmdUntil = 0;
+
+      // Active offline demo choreography descriptor
       this._demo = null;
 
-      // Cached viewport transform for responsive mouse/touch hit-testing
       this._view = { width: 574, height: 548, scale: 0.62, offX: 0, offY: 0, dpr: 1 };
-
-      // Asset loading state
       this.assets = {};
       this.assetsReady = false;
       this.assetError = null;
 
-      // Animation loop handle
       this._rafId = null;
       this._lastFrameTs = 0;
       this._elapsedSec = 0;
@@ -432,7 +451,7 @@
     }
 
     // -------------------------------------------------------------------------
-    // PUBLIC INTEGRATION API (FOR asrs_wms_dashboard_(5).html)
+    // PUBLIC INTEGRATION API (REAL HARDWARE + WMS HOOKS)
     // -------------------------------------------------------------------------
     setOccupancy(occMap) {
       if (!occMap) return;
@@ -465,8 +484,188 @@
     }
 
     /**
-     * Direct hook for `fetchTelemetry()` in `asrs_wms_dashboard_(5).html`.
-     * Feeds raw Firebase `/asrs/telemetry.json` payload + optional `BOX_OCCUPANCY` & `BOX_COORDINATES`.
+     * Immediate command dispatch hook — call right when the WMS writes to
+     * `/asrs/control/command` so the 3D twin starts responding with 0ms lag
+     * while awaiting ESP32 Firebase stage confirmations.
+     */
+    notifyCommand(cmdStr) {
+      if (!cmdStr) return;
+      const cmd = String(cmdStr).trim().toUpperCase();
+      const s = this.state;
+      const now = performance.now();
+
+      if (cmd === 'E_STOP') {
+        this.triggerEStop();
+        return;
+      }
+      if (cmd === 'UNLOCK') {
+        this.unlock();
+        return;
+      }
+      if (cmd === 'STOP' || cmd === 'SERVO_STOP' || cmd === 'SERVO:STOP') {
+        s.running = false;
+        s.jogVelX = 0; s.jogVelZ = 0;
+        s.goalXRev = s.xRev; s.goalZRev = s.zRev;
+        s.goalXVis = s.xVis; s.goalZVis = s.zVis;
+        s.goalForkExt = s.forkExt;
+        s.servoState = 'STOP';
+        s.xDir = 0; s.zDir = 0; s.forkDir = 0;
+        this._pendingCmdUntil = 0;
+        return;
+      }
+      if (cmd === 'ZERO') {
+        s.xRev = 0; s.zRev = 0; s.xVis = 0; s.zVis = 0;
+        s.goalXRev = 0; s.goalZRev = 0; s.goalXVis = 0; s.goalZVis = 0;
+        s.statusMsg = 'ZEROED POSITION (0.00, 0.00)';
+        return;
+      }
+      if (s.locked) return;
+
+      this._demo = null;
+      s.mode = 'live';
+      s.jogVelX = 0; s.jogVelZ = 0;
+
+      // STORE:B2:5.00:4.00 or RETRIEVE:A2:1.00:1.50
+      if (cmd.startsWith('STORE:') || cmd.startsWith('RETRIEVE:')) {
+        const parts = cmd.split(':');
+        const bayId = parts[1];
+        if (BAY_INFO[bayId]) {
+          const isStore = cmd.startsWith('STORE:');
+          const c = this._getBayFirmwareCoord(bayId, parts[2], parts[3]);
+          s.op = isStore ? 'STORAGE' : 'RETRIEVAL';
+          s.targetBay = bayId;
+          s.selectedBay = bayId;
+          s.stepStage = 1;
+          s.running = true;
+          s.carriedBox = isStore;
+          s.tempHideShelfBox = isStore ? bayId : null;
+          s.tempShowShelfBox = null;
+          s.goalXRev = c.x;
+          s.goalXVis = BAY_INFO[bayId].xRev;
+          s.goalZRev = s.zRev;
+          s.goalZVis = s.zVis;
+          s.goalForkExt = 0;
+          s.statusMsg = `DISPATCH -> ${s.op} ${bayId}`;
+          this._pendingCmdUntil = now + 2200;
+        }
+        return;
+      }
+
+      // TESTSLOT:B2:5.00:4.00
+      if (cmd.startsWith('TESTSLOT:')) {
+        const parts = cmd.split(':');
+        const bayId = parts[1];
+        if (BAY_INFO[bayId]) {
+          const c = this._getBayFirmwareCoord(bayId, parts[2], parts[3]);
+          s.op = 'TEST';
+          s.targetBay = bayId;
+          s.selectedBay = bayId;
+          s.stepStage = 0;
+          s.running = true;
+          s.carriedBox = false;
+          s.goalXRev = c.x;
+          s.goalZRev = c.z;
+          s.goalXVis = BAY_INFO[bayId].xRev;
+          s.goalZVis = BAY_INFO[bayId].zSeatVis;
+          s.goalForkExt = 0;
+          s.statusMsg = `TEST MOVE -> ${bayId}`;
+          this._pendingCmdUntil = now + 2200;
+        }
+        return;
+      }
+
+      // HOME / HOMING
+      if (cmd === 'HOME' || cmd === 'HOMING') {
+        s.op = cmd;
+        s.stepStage = 0;
+        s.running = true;
+        s.goalXRev = 0; s.goalZRev = 0;
+        s.goalXVis = 0; s.goalZVis = 0;
+        s.goalForkExt = 0;
+        s.statusMsg = cmd === 'HOMING' ? 'HOMING -> LS_X_RIGHT (0,0)' : 'RETURNING HOME (0,0)';
+        this._pendingCmdUntil = now + 2200;
+        return;
+      }
+
+      // Manual Servo Extend / Retract (SERVO:EXTEND_REV, SERVO:EXTEND, SERVO:RETRACT_REV, SERVO:RETRACT)
+      if (cmd.startsWith('SERVO:EXTEND') || cmd.startsWith('SERVO_EXTEND') || cmd === 'EXTEND') {
+        s.servoState = 'EXTEND';
+        s.goalForkExt = 1.0;
+        s.running = true;
+        this._pendingCmdUntil = now + 2200;
+        return;
+      }
+      if (cmd.startsWith('SERVO:RETRACT') || cmd.startsWith('SERVO_RETRACT') || cmd === 'RETRACT') {
+        s.servoState = 'RETRACT';
+        s.goalForkExt = 0.0;
+        s.running = true;
+        this._pendingCmdUntil = now + 2200;
+        return;
+      }
+
+      // Manual revolution jog commands: M1:<rev>, M2:<rev>, or bare numeric <rev> (both axes)
+      if (cmd.startsWith('M1:') || cmd.startsWith('MOVE1:')) {
+        const delta = parseFloat(cmd.split(':')[1]);
+        if (!isNaN(delta)) {
+          s.op = 'JOG'; s.running = true;
+          s.goalXRev = clamp(s.xRev + delta, 0, 8.2);
+          s.goalXVis = this._rawXToVis(s.goalXRev, null);
+          this._pendingCmdUntil = now + 2000;
+        }
+        return;
+      }
+      if (cmd.startsWith('M2:') || cmd.startsWith('MOVE2:')) {
+        const delta = parseFloat(cmd.split(':')[1]);
+        if (!isNaN(delta)) {
+          s.op = 'JOG'; s.running = true;
+          s.goalZRev = clamp(s.zRev + delta, 0, 7.0);
+          s.goalZVis = this._rawZToVis(s.goalZRev, null, 'NONE', 0);
+          this._pendingCmdUntil = now + 2000;
+        }
+        return;
+      }
+      if (/^[+-]?\d+(\.\d+)?$/.test(cmd)) {
+        const delta = parseFloat(cmd);
+        s.op = 'JOG'; s.running = true;
+        s.goalXRev = clamp(s.xRev + delta, 0, 8.2);
+        s.goalZRev = clamp(s.zRev + delta, 0, 7.0);
+        s.goalXVis = this._rawXToVis(s.goalXRev, null);
+        s.goalZVis = this._rawZToVis(s.goalZRev, null, 'NONE', 0);
+        this._pendingCmdUntil = now + 2000;
+        return;
+      }
+
+      // Continuous directional jog aliases
+      if (cmd === 'M1_CW' || cmd === 'X_PLUS' || cmd === 'JOG_X_POS') {
+        s.op = 'JOG'; s.running = true; s.jogVelX = 1; this._pendingCmdUntil = now + 1800;
+      } else if (cmd === 'M1_CCW' || cmd === 'X_MINUS' || cmd === 'JOG_X_NEG') {
+        s.op = 'JOG'; s.running = true; s.jogVelX = -1; this._pendingCmdUntil = now + 1800;
+      } else if (cmd === 'M2_CW' || cmd === 'Z_PLUS' || cmd === 'JOG_Z_POS') {
+        s.op = 'JOG'; s.running = true; s.jogVelZ = 1; this._pendingCmdUntil = now + 1800;
+      } else if (cmd === 'M2_CCW' || cmd === 'Z_MINUS' || cmd === 'JOG_Z_NEG') {
+        s.op = 'JOG'; s.running = true; s.jogVelZ = -1; this._pendingCmdUntil = now + 1800;
+      }
+    }
+
+    _getBayFirmwareCoord(bayId, xOpt, zOpt) {
+      const cfg = this.coordinates[bayId] || BAY_INFO[bayId];
+      const px = parseFloat(xOpt);
+      const pz = parseFloat(zOpt);
+      return {
+        x: (!isNaN(px) && px >= 0) ? px : cfg.x,
+        z: (!isNaN(pz) && pz >= 0) ? pz : cfg.z
+      };
+    }
+
+    /**
+     * Authoritative real-time Firebase `/asrs/telemetry` handler (works with BOTH
+     * Server-Sent Events EventSource streaming AND HTTP polling!).
+     *
+     * Key design: ESP32 pushes telemetry at each stage entry (so `m1_rev` during
+     * Stage 1 is still the start-of-stage reading until Stage 2 starts!). This method
+     * distinguishes fresh encoder updates from repeated same-stage snapshots and sets
+     * the true stage destination goal so the 3D machine moves smoothly in real time
+     * instead of snapping back to 0 every second!
      */
     updateFromTelemetry(data, occMap = null, coordMap = null) {
       if (occMap) this.setOccupancy(occMap);
@@ -476,117 +675,274 @@
         return;
       }
 
-      this.state.mode = 'live';
-      this._demo = null;
-      this.state.online = true;
       const now = performance.now();
-      this.state.lastTelemetryMs = now;
-      this.state.rtdbPulseUntil = now + 380;
-
       const s = this.state;
-      const prevStage = s.stepStage;
-      const prevOp = s.op;
+      this._demo = null;
+      s.mode = 'live';
+      s.online = true;
+      s.lastTelemetryMs = now;
+      s.rtdbPulseUntil = now + 380;
 
-      s.locked = !!data.locked;
-      s.running = !!data.running;
+      const rawM1 = Number(data.m1_rev || 0);
+      const rawM2 = Number(data.m2_rev || 0);
+      const rawLocked = !!data.locked;
+      const rawRunning = !!data.running;
+      const rawStage = Number(data.step_stage || 0);
+      const rawOp = String(data.op || 'NONE').toUpperCase();
+      const rawBox = String(data.box || 'NONE').toUpperCase();
+      const rawBay = BAY_INFO[rawBox] ? rawBox : null;
+      const rawServo = String(data.servo_state || 'STOP').toUpperCase();
+      const rawStatus = String(data.status || (rawLocked ? 'EMERGENCY STOP (LOCKED)' : 'ONLINE')).toUpperCase();
+
+      // Update motor kinematic parameters from ESP32
       s.rpm = Number(data.rpm || s.rpm || 60);
       s.accel = Number(data.accel || s.accel || 800);
       s.servoExtRev = Number(data.servo_ext_rev || s.servoExtRev || 1.5);
       s.servoRetRev = Number(data.servo_ret_rev || s.servoRetRev || 1.5);
       s.servoMsRev = Number(data.servo_ms_rev || s.servoMsRev || 1000);
       if (data.z_offset !== undefined && !isNaN(parseFloat(data.z_offset))) {
-        s.zOffsetRev = parseFloat(data.z_offset);
+        s.zOffsetRev = Math.max(0.02, Math.abs(parseFloat(data.z_offset)));
       }
 
-      const rawBox = String(data.box || 'NONE').toUpperCase();
-      s.targetBay = BAY_INFO[rawBox] ? rawBox : null;
-      s.op = String(data.op || 'NONE').toUpperCase();
-      s.stepStage = Number(data.step_stage || 0);
-      s.servoState = String(data.servo_state || 'STOP').toUpperCase();
-      s.statusMsg = String(data.status || (s.locked ? 'EMERGENCY STOP (LOCKED)' : 'ONLINE')).toUpperCase();
-      s.zVisOverride = null;
+      // If we just dispatched a command < 2s ago and Firebase hasn't echoed `running: true`
+      // or a state change yet, don't let the stale previous idle packet cancel our motion!
+      const prev = this._lastRaw;
+      const packetChanged = !prev ||
+        prev.stepStage !== rawStage ||
+        prev.running !== rawRunning ||
+        prev.locked !== rawLocked ||
+        prev.servoState !== rawServo ||
+        prev.status !== rawStatus ||
+        Math.abs(prev.m1Rev - rawM1) > 0.005 ||
+        Math.abs(prev.m2Rev - rawM2) > 0.005;
 
-      // Authoritative encoder positions from ESP32 AccelStepper
-      if (data.m1_rev !== undefined && !isNaN(Number(data.m1_rev))) {
-        s.targetXRev = Number(data.m1_rev);
+      if (!rawLocked && !rawRunning && rawStage === 0 && !packetChanged && now < this._pendingCmdUntil) {
+        return;
       }
-      if (data.m2_rev !== undefined && !isNaN(Number(data.m2_rev))) {
-        s.targetZRev = Number(data.m2_rev);
-      }
-
-      // Snap immediately if this is the very first telemetry packet or if locked
-      if (prevOp === 'NONE' && !s.running && s.stepStage === 0) {
-        s.xRev = s.targetXRev;
-        s.zRev = s.targetZRev;
+      if (rawRunning || rawStage > 0 || rawLocked || packetChanged) {
+        this._pendingCmdUntil = 0;
       }
 
-      // Infer servo fork target position from firmware stage + servo_state
-      if (s.servoState === 'EXTEND') {
-        s.targetForkExt = 1.0;
-      } else if (s.servoState === 'RETRACT') {
-        s.targetForkExt = 0.0;
-      } else if (s.stepStage === 4) {
-        s.targetForkExt = 1.0; // Stage 4 (Z lift/drop) always executes with fork fully extended
-        s.forkDir = 0;
-      } else if (s.stepStage === 0 || s.stepStage === 1 || s.stepStage === 2 || s.stepStage === 6) {
-        s.targetForkExt = 0.0;
-        if (s.servoState === 'STOP') s.forkDir = 0;
-      }
-      if (s.servoState === 'STOP' && Math.abs(s.targetForkExt - s.forkExt) < 0.02) {
-        s.forkDir = 0;
+      const isFirstPacket = !prev;
+      const stageChanged = !prev || prev.stepStage !== rawStage || prev.op !== rawOp || prev.targetBay !== rawBay;
+      const rawM1Changed = !prev || Math.abs(prev.m1Rev - rawM1) > 0.005;
+      const rawM2Changed = !prev || Math.abs(prev.m2Rev - rawM2) > 0.005;
+
+      this._lastRaw = {
+        m1Rev: rawM1,
+        m2Rev: rawM2,
+        stepStage: rawStage,
+        op: rawOp,
+        targetBay: rawBay,
+        servoState: rawServo,
+        running: rawRunning,
+        locked: rawLocked,
+        status: rawStatus
+      };
+
+      s.locked = rawLocked;
+      s.running = rawRunning;
+      s.stepStage = rawStage;
+      s.op = rawOp;
+      s.targetBay = rawBay;
+      s.servoState = rawServo;
+      s.statusMsg = rawStatus;
+
+      // 1. E-STOP SAFETY LOCK: Halt immediately in place!
+      if (s.locked) {
+        s.running = false;
+        s.jogVelX = 0; s.jogVelZ = 0;
+        s.goalXRev = s.xRev; s.goalZRev = s.zRev;
+        s.goalXVis = s.xVis; s.goalZVis = s.zVis;
+        s.goalForkExt = s.forkExt;
+        s.xDir = 0; s.zDir = 0; s.forkDir = 0;
+        if (this.options.onStateChange) this.options.onStateChange(this.getSnapshot());
+        return;
       }
 
-      // Infer physical carried box state & transient shelf handoff
-      s.tempShowShelfBox = null;
-      s.tempHideShelfBox = null;
-      if (s.op === 'STORAGE' && s.targetBay) {
-        if (s.stepStage >= 1 && s.stepStage <= 4) {
-          s.carriedBox = true;
-          s.tempHideShelfBox = s.targetBay;
-        } else if (s.stepStage === 5 || s.stepStage === 6) {
-          s.carriedBox = false;
-          s.tempShowShelfBox = s.targetBay;
-        } else if (prevStage >= 5 && s.stepStage === 0) {
-          s.carriedBox = false;
-        }
-      } else if (s.op === 'RETRIEVAL' && s.targetBay) {
-        if (s.stepStage >= 1 && s.stepStage <= 3) {
-          s.carriedBox = false;
-        } else if (s.stepStage >= 4 && s.stepStage <= 6) {
-          s.carriedBox = true;
-          s.tempHideShelfBox = s.targetBay;
-        } else if (prevStage >= 5 && s.stepStage === 0) {
-          s.carriedBox = true; // arrived at Home I/O port with retrieved box
-        }
-      } else if (!s.running && s.stepStage === 0 && !s.statusMsg.includes('RETRIEV')) {
+      // 2. First packet at startup (idle): snap directly to hardware position
+      if (isFirstPacket && !rawRunning && rawStage === 0) {
+        s.xRev = rawM1; s.zRev = rawM2;
+        s.goalXRev = rawM1; s.goalZRev = rawM2;
+        s.xVis = this._rawXToVis(rawM1, rawBay);
+        s.zVis = this._rawZToVis(rawM2, rawBay, rawOp, 0);
+        s.goalXVis = s.xVis; s.goalZVis = s.zVis;
+        s.forkExt = rawServo === 'EXTEND' ? 1.0 : 0.0;
+        s.goalForkExt = s.forkExt;
         s.carriedBox = false;
+        if (this.options.onStateChange) this.options.onStateChange(this.getSnapshot());
+        return;
       }
 
-      // Detect limit switch homing hit from firmware status banner
-      s.homingSwitchHit = s.statusMsg.includes('LS_X_RIGHT') ||
-        (s.statusMsg.includes('HOMING COMPLETE') && s.xRev < 0.05 && s.zRev < 0.05);
+      // 3. ACTIVE 6-STEP ASRS SEQUENCE (step_stage 1..6)
+      //    Set true stage destination goal so motion glides continuously between ESP32 syncs!
+      if (rawStage >= 1 && rawStage <= 6 && rawBay) {
+        s.jogVelX = 0; s.jogVelZ = 0;
+        const bayInfo = BAY_INFO[rawBay];
+        const bayCal = this.coordinates[rawBay] || { x: bayInfo.xRev, z: bayInfo.zRev };
+        const isStore = (rawOp === 'STORAGE');
+        const zHoverVis = bayInfo.zSeatVis + VISUAL_LIFT_REV; // clean ~9.2px above shelf floor
+        const zSeatVis = bayInfo.zSeatVis;                    // flush on shelf floor
+        const zAfterCal = isStore ? Math.max(0, bayCal.z - s.zOffsetRev) : (bayCal.z + s.zOffsetRev);
+
+        if (rawStage === 1) {
+          // STEP 1: Move X -> targetBay
+          if (stageChanged && rawM1Changed) {
+            s.xRev = rawM1;
+            s.xVis = this._rawXToVis(rawM1, rawBay);
+          }
+          s.goalXRev = bayCal.x;
+          s.goalXVis = bayInfo.xRev;
+          s.goalZRev = rawM2;
+          s.goalZVis = this._rawZToVis(rawM2, rawBay, rawOp, rawStage);
+          s.goalForkExt = 0.0;
+          s.carriedBox = isStore;
+          s.tempHideShelfBox = isStore ? rawBay : null;
+          s.tempShowShelfBox = null;
+        } else if (rawStage === 2) {
+          // STEP 2: Move Z -> targetBay (X already arrived at targetBay!)
+          s.goalXRev = bayCal.x;
+          s.goalXVis = bayInfo.xRev;
+          s.goalZRev = bayCal.z;
+          s.goalZVis = isStore ? zHoverVis : zSeatVis;
+          s.goalForkExt = 0.0;
+          s.carriedBox = isStore;
+          s.tempHideShelfBox = isStore ? rawBay : null;
+          s.tempShowShelfBox = null;
+        } else if (rawStage === 3) {
+          // STEP 3: 360° Servo Extend into targetBay
+          s.goalXRev = bayCal.x;
+          s.goalXVis = bayInfo.xRev;
+          s.goalZRev = bayCal.z;
+          s.goalZVis = isStore ? zHoverVis : zSeatVis;
+          s.goalForkExt = 1.0;
+          s.carriedBox = isStore;
+          s.tempHideShelfBox = isStore ? rawBay : null;
+          s.tempShowShelfBox = null;
+        } else if (rawStage === 4) {
+          // STEP 4: Z Drop (-zOffset for STORE) or Z Lift (+zOffset for RETRIEVE)
+          s.goalXRev = bayCal.x;
+          s.goalXVis = bayInfo.xRev;
+          s.goalZRev = zAfterCal;
+          s.goalZVis = isStore ? zSeatVis : zHoverVis;
+          s.goalForkExt = 1.0;
+          s.forkDir = 0;
+          s.carriedBox = true;
+          s.tempHideShelfBox = rawBay;
+          s.tempShowShelfBox = null;
+        } else if (rawStage === 5) {
+          // STEP 5: 360° Servo Retract out of targetBay
+          s.goalXRev = bayCal.x;
+          s.goalXVis = bayInfo.xRev;
+          s.goalZRev = zAfterCal;
+          s.goalZVis = isStore ? zSeatVis : zHoverVis;
+          s.goalForkExt = 0.0;
+          if (isStore) {
+            s.carriedBox = false;
+            s.tempShowShelfBox = rawBay;
+            s.tempHideShelfBox = null;
+          } else {
+            s.carriedBox = true;
+            s.tempHideShelfBox = rawBay;
+            s.tempShowShelfBox = null;
+          }
+        } else if (rawStage === 6) {
+          // STEP 6: Simultaneous Return Home (0, 0)
+          s.goalXRev = 0.0;
+          s.goalZRev = 0.0;
+          s.goalXVis = 0.0;
+          s.goalZVis = 0.0;
+          s.goalForkExt = 0.0;
+          if (isStore) {
+            s.carriedBox = false;
+            s.tempShowShelfBox = rawBay;
+            s.tempHideShelfBox = null;
+          } else {
+            s.carriedBox = true;
+            s.tempHideShelfBox = rawBay;
+            s.tempShowShelfBox = null;
+          }
+        }
+      } else {
+        // 4. NON-ASRS OPERATION OR IDLE (step_stage === 0):
+        //    Handles TESTSLOT, HOME, HOMING, Manual Jog, Manual Servo, and Cycle Complete!
+        s.tempShowShelfBox = null;
+        s.tempHideShelfBox = null;
+
+        if (rawServo === 'EXTEND') {
+          s.goalForkExt = 1.0;
+        } else if (rawServo === 'RETRACT') {
+          s.goalForkExt = 0.0;
+        } else if (!rawRunning) {
+          s.goalForkExt = 0.0;
+          s.forkDir = 0;
+        }
+
+        if (rawRunning) {
+          if (rawStatus.includes('HOME') || rawStatus.includes('HOMING') || rawStatus.includes('RETURN')) {
+            s.jogVelX = 0; s.jogVelZ = 0;
+            s.goalXRev = 0.0; s.goalZRev = 0.0;
+            s.goalXVis = 0.0; s.goalZVis = 0.0;
+            s.goalForkExt = 0.0;
+          } else if (rawBay && (rawStatus.includes('TEST') || rawStatus.includes('MOVING') || rawStatus.includes('SLOT'))) {
+            s.jogVelX = 0; s.jogVelZ = 0;
+            const bayInfo = BAY_INFO[rawBay];
+            const bayCal = this.coordinates[rawBay] || { x: bayInfo.xRev, z: bayInfo.zRev };
+            s.goalXRev = bayCal.x;
+            s.goalZRev = bayCal.z;
+            s.goalXVis = bayInfo.xRev;
+            s.goalZVis = bayInfo.zSeatVis;
+          } else {
+            if (rawM1Changed) {
+              s.goalXRev = rawM1;
+              s.goalXVis = this._rawXToVis(rawM1, rawBay);
+            }
+            if (rawM2Changed) {
+              s.goalZRev = rawM2;
+              s.goalZVis = this._rawZToVis(rawM2, rawBay, rawOp, 0);
+            }
+          }
+        } else {
+          // Idle / Completed — smoothly converge to authoritative ESP32 position
+          s.jogVelX = 0; s.jogVelZ = 0;
+          s.goalXRev = rawM1;
+          s.goalZRev = rawM2;
+          s.goalXVis = this._rawXToVis(rawM1, rawBay);
+          s.goalZVis = this._rawZToVis(rawM2, rawBay, rawOp, 0);
+          if (rawOp === 'RETRIEVAL' && rawStatus.includes('COMPLETE') && rawM1 < 0.08 && rawM2 < 0.08) {
+            s.carriedBox = true; // retrieved pallet resting on fork at Home I/O
+          } else if (rawM1 < 0.08 && rawM2 < 0.08) {
+            s.carriedBox = false;
+          }
+        }
+      }
+
+      s.homingSwitchHit = rawStatus.includes('LS_X_RIGHT') ||
+        (rawStatus.includes('HOMING COMPLETE') && rawM1 < 0.05 && rawM2 < 0.05);
 
       if (this.options.onStateChange) this.options.onStateChange(this.getSnapshot());
     }
 
     /**
-     * Direct manual pose setter (great for Settings -> Manual Jog preview).
+     * Direct manual pose setter (for commissioning / manual jog tests).
      */
-    setPose(xRev, zRev, forkExt = 0, carriedBox = false) {
-      this.state.mode = 'manual';
+    setPose(xVis, zVis, forkExt = 0, carriedBox = false) {
+      const s = this.state;
+      s.mode = 'manual';
       this._demo = null;
-      this.state.targetXRev = clamp(Number(xRev) || 0, 0, 8.6);
-      this.state.targetZRev = clamp(Number(zRev) || 0, 0, 7.2);
-      this.state.targetForkExt = clamp(Number(forkExt) || 0, 0, 1);
-      this.state.carriedBox = !!carriedBox;
-      this.state.zVisOverride = null;
-      this.state.op = 'MANUAL';
-      this.state.stepStage = 0;
-      this.state.statusMsg = `MANUAL POSE -> X:${this.state.targetXRev.toFixed(2)}r  Z:${this.state.targetZRev.toFixed(2)}r`;
+      s.goalXVis = clamp(Number(xVis) || 0, 0, 8.0);
+      s.goalZVis = clamp(Number(zVis) || 0, 0, 6.235);
+      s.goalXRev = s.goalXVis;
+      s.goalZRev = s.goalZVis;
+      s.goalForkExt = clamp(Number(forkExt) || 0, 0, 1);
+      s.carriedBox = !!carriedBox;
+      s.op = 'MANUAL';
+      s.stepStage = 0;
+      s.statusMsg = `MANUAL POSE -> X:${s.goalXVis.toFixed(2)}r  Z:${s.goalZVis.toFixed(2)}r`;
     }
 
     // -------------------------------------------------------------------------
-    // BUILT-IN OFFLINE DEMO SIMULATOR (ALL 9 BAYS + HOMING + E-STOP)
+    // BUILT-IN OFFLINE PREVIEW SIMULATOR (OPTIONAL SANDBOX)
     // -------------------------------------------------------------------------
     runDemoCycle(opType = 'STORAGE', bayId = 'C2', opts = {}) {
       const bay = BAY_INFO[String(bayId).toUpperCase()];
@@ -598,25 +954,27 @@
       }
 
       const rpm = Number(opts.rpm || this.state.rpm || 60);
-      const duration = Number(opts.duration || (rpm >= 100 ? 7.5 : 10.5));
+      const duration = Number(opts.duration || (rpm >= 100 ? 7.2 : 9.5));
       this.state.mode = 'demo';
       this.state.selectedBay = bay.id;
       this.state.targetBay = bay.id;
       this.state.op = op;
       this.state.rpm = rpm;
       this.state.homingSwitchHit = false;
-      this.state.zVisOverride = null;
+      this.state.jogVelX = 0; this.state.jogVelZ = 0;
 
-      // Ensure realistic starting shelf occupancy for demo clarity
       if (op === 'RETRIEVAL') this.occ[bay.id] = true;
       if (op === 'STORAGE') this.occ[bay.id] = false;
 
+      const cal = this.coordinates[bay.id] || { x: bay.xRev, z: bay.zRev };
       this._demo = {
         kind: 'cycle',
         op,
         bayId: bay.id,
-        tx: this.coordinates[bay.id].x,
-        tz: this.coordinates[bay.id].z,
+        txVis: bay.xRev,
+        tzSeatVis: bay.zSeatVis,
+        txRev: cal.x,
+        tzRev: cal.z,
         t: 0,
         dur: duration,
         committed: false,
@@ -626,12 +984,9 @@
     }
 
     runHomingDemo(opts = {}) {
-      if (this.state.locked) {
-        this.state.statusMsg = 'REJECTED: SYSTEM LOCKED — SEND UNLOCK FIRST';
-        return false;
-      }
-      const startX = this.state.xRev > 0.3 ? this.state.xRev : 4.6;
-      const startZ = this.state.zRev > 0.3 ? this.state.zRev : 3.8;
+      if (this.state.locked) return false;
+      const startXVis = this.state.xVis > 0.3 ? this.state.xVis : 4.6;
+      const startZVis = this.state.zVis > 0.3 ? this.state.zVis : 3.6;
       this.state.mode = 'demo';
       this.state.op = 'HOMING';
       this.state.targetBay = null;
@@ -639,32 +994,33 @@
       this.state.forkExt = 0;
       this._demo = {
         kind: 'homing',
-        startX,
-        startZ,
+        startXVis,
+        startZVis,
         t: 0,
-        dur: Number(opts.duration || 4.8),
+        dur: Number(opts.duration || 4.5),
         onComplete: typeof opts.onComplete === 'function' ? opts.onComplete : null
       };
       return true;
     }
 
     triggerEStop() {
-      this.state.locked = true;
-      this.state.running = false;
-      this.state.xDir = 0;
-      this.state.zDir = 0;
-      this.state.forkDir = 0;
-      this.state.servoState = 'STOP';
-      this.state.op = 'E-STOP';
-      this.state.statusMsg = 'EMERGENCY STOP (LOCKED) — MOTORS HALTED';
+      const s = this.state;
+      s.locked = true;
+      s.running = false;
+      s.jogVelX = 0; s.jogVelZ = 0;
+      s.xDir = 0; s.zDir = 0; s.forkDir = 0;
+      s.servoState = 'STOP';
+      s.op = 'E-STOP';
+      s.statusMsg = 'EMERGENCY STOP (LOCKED) — MOTORS HALTED';
       this._demo = null;
       if (this.options.onStateChange) this.options.onStateChange(this.getSnapshot());
     }
 
     unlock() {
-      this.state.locked = false;
-      this.state.op = 'IDLE';
-      this.state.statusMsg = 'IDLE (UNLOCKED) — SAFETY LOCK RELEASED';
+      const s = this.state;
+      s.locked = false;
+      s.op = 'IDLE';
+      s.statusMsg = 'IDLE (UNLOCKED) — SAFETY LOCK RELEASED';
       if (this.options.onStateChange) this.options.onStateChange(this.getSnapshot());
     }
 
@@ -672,6 +1028,8 @@
       return {
         xRev: this.state.xRev,
         zRev: this.state.zRev,
+        xVis: this.state.xVis,
+        zVis: this.state.zVis,
         forkExt: this.state.forkExt,
         servoState: this.state.servoState,
         stepStage: this.state.stepStage,
@@ -686,10 +1044,65 @@
     }
 
     // -------------------------------------------------------------------------
-    // 4. FRAME PHYSICS STEPPER (60 FPS LIVE INTERPOLATION OR DEMO CHOREOGRAPHY)
+    // 4. PER-BAY CALIBRATED COORDINATE MAPPING (ZERO MISALIGNMENT!)
+    // -------------------------------------------------------------------------
+    _rawXToVis(rawX, bayId) {
+      if (rawX <= 0.001) return 0.0;
+      if (bayId && BAY_INFO[bayId]) {
+        const calX = (this.coordinates[bayId] && this.coordinates[bayId].x > 0.01)
+          ? this.coordinates[bayId].x
+          : BAY_INFO[bayId].xRev;
+        return clamp((rawX / calX) * BAY_INFO[bayId].xRev, 0, 8.1);
+      }
+      // Fallback when no specific bay is active: use clean reference scale (8.0 max)
+      const maxX = Math.max(2.0, ...Object.values(this.coordinates).map(c => c.x || 0));
+      return clamp((rawX / maxX) * 8.0, 0, 8.1);
+    }
+
+    _rawZToVis(rawZ, bayId, op, stepStage) {
+      if (rawZ <= 0.001) return 0.0;
+      const zOff = this.state.zOffsetRev || 0.40;
+      if (bayId && BAY_INFO[bayId]) {
+        const b = BAY_INFO[bayId];
+        const calZ = (this.coordinates[bayId] && this.coordinates[bayId].z > 0.01)
+          ? this.coordinates[bayId].z
+          : b.zRev;
+        const zHoverVis = b.zSeatVis + VISUAL_LIFT_REV;
+
+        if (op === 'STORAGE') {
+          if (stepStage === 4 || stepStage === 5) {
+            const dropFrac = clamp((calZ - rawZ) / Math.max(0.02, zOff), 0, 1);
+            return clamp(zHoverVis - dropFrac * VISUAL_LIFT_REV, 0, 6.25);
+          }
+          if (stepStage === 6) {
+            const zStart = Math.max(0.05, calZ - zOff);
+            return clamp((rawZ / zStart) * b.zSeatVis, 0, 6.25);
+          }
+          return clamp((rawZ / calZ) * zHoverVis, 0, 6.25);
+        } else if (op === 'RETRIEVAL') {
+          if (stepStage === 4 || stepStage === 5) {
+            const liftFrac = clamp((rawZ - calZ) / Math.max(0.02, zOff), 0, 1);
+            return clamp(b.zSeatVis + liftFrac * VISUAL_LIFT_REV, 0, 6.25);
+          }
+          if (stepStage === 6) {
+            const zStart = Math.max(0.05, calZ + zOff);
+            return clamp((rawZ / zStart) * zHoverVis, 0, 6.25);
+          }
+          return clamp((rawZ / calZ) * b.zSeatVis, 0, 6.25);
+        }
+        return clamp((rawZ / calZ) * b.zSeatVis, 0, 6.25);
+      }
+      const maxZ = Math.max(1.5, ...Object.values(this.coordinates).map(c => c.z || 0));
+      return clamp((rawZ / maxZ) * 6.10, 0, 6.25);
+    }
+
+    // -------------------------------------------------------------------------
+    // 5. 60 FPS PHYSICS STEPPER (LIVE REAL HARDWARE TRACKING OR DEMO)
     // -------------------------------------------------------------------------
     _step(dt, nowMs) {
       const s = this.state;
+      s._rtdbActive = nowMs < s.rtdbPulseUntil;
+
       if (s.locked) {
         s.running = false;
         s.xDir = 0; s.zDir = 0; s.forkDir = 0;
@@ -701,70 +1114,89 @@
         return;
       }
 
-      // --- LIVE TELEMETRY & MANUAL POSE SMOOTHING ---
+      // Continuous manual jog (when operator holds/sends M1_CW / M2_CW etc.)
       const revPerSec = Math.max(0.6, (s.rpm || 60) / 60);
-      const maxDelta = revPerSec * 1.45 * dt;
-
-      // Optional dead-reckoning between 1000ms Firebase polls during active ASRS stages
-      if (s.mode === 'live' && this.options.predictBetweenPolls && s.running && s.targetBay) {
-        const bayC = this.coordinates[s.targetBay] || BAY_INFO[s.targetBay];
-        if (s.stepStage === 1 && bayC) {
-          s.targetXRev = this._advanceToward(s.targetXRev, bayC.x, revPerSec * dt);
-        } else if (s.stepStage === 2 && bayC) {
-          s.targetZRev = this._advanceToward(s.targetZRev, bayC.z, revPerSec * dt);
-        } else if (s.stepStage === 4 && bayC) {
-          const zGoal = s.op === 'STORAGE' ? (bayC.z - s.zOffsetRev) : (bayC.z + s.zOffsetRev);
-          s.targetZRev = this._advanceToward(s.targetZRev, zGoal, revPerSec * 0.7 * dt);
-        } else if (s.stepStage === 6) {
-          s.targetXRev = this._advanceToward(s.targetXRev, 0, revPerSec * dt);
-          s.targetZRev = this._advanceToward(s.targetZRev, 0, revPerSec * dt);
-        }
+      if (s.jogVelX !== 0) {
+        s.goalXVis = clamp(s.goalXVis + s.jogVelX * revPerSec * 1.4 * dt, 0, 8.0);
+        s.goalXRev = clamp(s.goalXRev + s.jogVelX * revPerSec * dt, 0, 8.0);
+      }
+      if (s.jogVelZ !== 0) {
+        s.goalZVis = clamp(s.goalZVis + s.jogVelZ * revPerSec * 1.4 * dt, 0, 6.10);
+        s.goalZRev = clamp(s.goalZRev + s.jogVelZ * revPerSec * dt, 0, 6.50);
       }
 
-      // Smooth damped motion toward targets
-      const dx = s.targetXRev - s.xRev;
-      const dz = s.targetZRev - s.zRev;
-      const smoothAlpha = 1 - Math.exp(-9.0 * dt);
+      // Compute realistic visual travel speed matched to firmware RPM & bay calibration!
+      // Example: if A1 is calibrated at 0.2 rev (0.2s real time) and 2.0 visual rev,
+      // visual speed scales proportionally so arrival time matches the real hardware!
+      let visSpeedX = revPerSec * 1.25;
+      let visSpeedZ = revPerSec * 1.25;
+      if (s.targetBay && BAY_INFO[s.targetBay]) {
+        const b = BAY_INFO[s.targetBay];
+        const cal = this.coordinates[s.targetBay] || { x: b.xRev, z: b.zRev };
+        const scaleX = clamp(b.xRev / Math.max(0.15, cal.x), 0.7, 6.0);
+        const scaleZ = clamp(b.zSeatVis / Math.max(0.15, cal.z), 0.7, 6.0);
+        visSpeedX = revPerSec * scaleX * 1.15;
+        visSpeedZ = revPerSec * scaleZ * 1.15;
+      }
+      // Stage 4 (Z lift/drop) is a short precision 0.135 visual rev move — smooth & visible
+      if (s.stepStage === 4) {
+        visSpeedZ = clamp(VISUAL_LIFT_REV / Math.max(0.28, (s.zOffsetRev || 0.4) / revPerSec), 0.25, 0.75);
+      }
 
-      if (Math.abs(dx) > 0.002) {
-        const stepX = clamp(dx * smoothAlpha, -maxDelta, maxDelta);
-        s.xRev += Math.abs(stepX) > Math.abs(dx) ? dx : stepX;
-        s.xDir = dx > 0 ? 1 : -1;
+      // Smooth damped motion along visual X & Z (plus displayed firmware xRev / zRev)
+      const dxVis = s.goalXVis - s.xVis;
+      const dzVis = s.goalZVis - s.zVis;
+      const maxStepX = visSpeedX * dt;
+      const maxStepZ = visSpeedZ * dt;
+
+      if (Math.abs(dxVis) > 0.004) {
+        const damped = dxVis * (1 - Math.exp(-10.0 * dt));
+        const step = Math.abs(damped) > maxStepX ? Math.sign(dxVis) * maxStepX : damped;
+        const minStep = Math.sign(dxVis) * Math.min(Math.abs(dxVis), maxStepX * 0.45);
+        s.xVis += Math.abs(step) < Math.abs(minStep) ? minStep : step;
+        s.xDir = dxVis > 0 ? 1 : -1;
       } else {
-        s.xRev = s.targetXRev;
+        s.xVis = s.goalXVis;
         s.xDir = 0;
       }
 
-      if (Math.abs(dz) > 0.002) {
-        const stepZ = clamp(dz * smoothAlpha, -maxDelta, maxDelta);
-        s.zRev += Math.abs(stepZ) > Math.abs(dz) ? dz : stepZ;
-        s.zDir = dz > 0 ? 1 : -1;
+      if (Math.abs(dzVis) > 0.004) {
+        const damped = dzVis * (1 - Math.exp(-10.0 * dt));
+        const step = Math.abs(damped) > maxStepZ ? Math.sign(dzVis) * maxStepZ : damped;
+        const minStep = Math.sign(dzVis) * Math.min(Math.abs(dzVis), maxStepZ * 0.45);
+        s.zVis += Math.abs(step) < Math.abs(minStep) ? minStep : step;
+        s.zDir = dzVis > 0 ? 1 : -1;
       } else {
-        s.zRev = s.targetZRev;
+        s.zVis = s.goalZVis;
         s.zDir = 0;
       }
 
-      // Smooth 360° continuous servo fork stroke
+      // Smoothly interpolate displayed firmware rev counters alongside visual pose
+      const dxRev = s.goalXRev - s.xRev;
+      const dzRev = s.goalZRev - s.zRev;
+      if (Math.abs(dxRev) > 0.002) {
+        s.xRev += Math.sign(dxRev) * Math.min(Math.abs(dxRev), revPerSec * 1.3 * dt);
+      } else {
+        s.xRev = s.goalXRev;
+      }
+      if (Math.abs(dzRev) > 0.002) {
+        s.zRev += Math.sign(dzRev) * Math.min(Math.abs(dzRev), revPerSec * 1.3 * dt);
+      } else {
+        s.zRev = s.goalZRev;
+      }
+
+      // Smooth 360° continuous servo fork stroke matched to real `servo_ext_rev * servo_ms_rev`
       const extDurSec = Math.max(0.35, (s.servoExtRev * s.servoMsRev) / 1000);
       const retDurSec = Math.max(0.35, (s.servoRetRev * s.servoMsRev) / 1000);
-      const df = s.targetForkExt - s.forkExt;
-      if (Math.abs(df) > 0.003) {
+      const df = s.goalForkExt - s.forkExt;
+      if (Math.abs(df) > 0.004) {
         const rate = df > 0 ? (dt / extDurSec) : (dt / retDurSec);
         s.forkExt += Math.sign(df) * Math.min(Math.abs(df), rate);
         s.forkDir = df > 0 ? 1 : -1;
       } else {
-        s.forkExt = s.targetForkExt;
+        s.forkExt = s.goalForkExt;
         s.forkDir = 0;
       }
-
-      // Keep RTDB pulse alive briefly after each packet
-      s._rtdbActive = nowMs < s.rtdbPulseUntil;
-    }
-
-    _advanceToward(cur, goal, step) {
-      const diff = goal - cur;
-      if (Math.abs(diff) <= step) return goal;
-      return cur + Math.sign(diff) * step;
     }
 
     _stepDemo(dt) {
@@ -778,20 +1210,21 @@
         s.xDir = 0; s.zDir = 0; s.forkDir = 0;
         if (u < 0.72) {
           const p = u / 0.72;
-          s.xRev = d.startX * (1 - p);
-          s.zRev = d.startZ * (1 - p);
+          s.xVis = d.startXVis * (1 - p);
+          s.zVis = d.startZVis * (1 - p);
+          s.xRev = s.xVis; s.zRev = s.zVis;
           s.running = true;
-          s.xDir = s.xRev > 0.02 ? -1 : 0;
-          s.zDir = s.zRev > 0.02 ? -1 : 0;
+          s.xDir = s.xVis > 0.02 ? -1 : 0;
+          s.zDir = s.zVis > 0.02 ? -1 : 0;
           s.homingSwitchHit = false;
           s.statusMsg = 'HOMING (CONTINUOUS SPIN -> LS_X_RIGHT)';
         } else if (u < 0.94) {
-          s.xRev = 0; s.zRev = 0;
+          s.xVis = 0; s.zVis = 0; s.xRev = 0; s.zRev = 0;
           s.running = false;
           s.homingSwitchHit = true;
           s.statusMsg = 'LS_X_RIGHT (GPIO 19) HIT -> ZEROED (0,0)';
         } else {
-          s.xRev = 0; s.zRev = 0;
+          s.xVis = 0; s.zVis = 0; s.xRev = 0; s.zRev = 0;
           s.running = false;
           s.homingSwitchHit = false;
           s.op = 'IDLE';
@@ -804,19 +1237,21 @@
         return;
       }
 
-      // --- 6-STEP ACCELSTEPPER ASRS DEMO CYCLE ---
+      // --- 6-STEP ACCELSTEPPER ASRS DEMO CYCLE (USING CLEAN VISUAL CLEARANCE!) ---
       const u = clamp(d.t / d.dur, 0, 1);
       const isStore = (d.op === 'STORAGE');
-      const tx = d.tx, tz = d.tz, zOff = s.zOffsetRev || 0.40;
+      const txVis = d.txVis;
+      const zSeatVis = d.tzSeatVis;
+      const zHoverVis = zSeatVis + VISUAL_LIFT_REV;
+      const zOff = s.zOffsetRev || 0.40;
 
-      // Exact fractional stage windows summing to 1.0
       const t1 = 0.05; // Dispatch
       const t2 = 0.22; // Step 1: Move X
       const t3 = 0.40; // Step 2: Move Z
-      const t4 = 0.54; // Step 3: Servo Extend + 150ms Settle
-      const t5 = 0.64; // Step 4: Z Drop (-0.40) or Lift (+0.40)
-      const t6 = 0.77; // Step 5: Servo Retract + 150ms Settle
-      const t7 = 0.94; // Step 6: Simultaneous Home (0,0)
+      const t4 = 0.54; // Step 3: Servo Extend + settle
+      const t5 = 0.64; // Step 4: Z Drop / Lift (~9.2px clearance, zero ceiling clip!)
+      const t6 = 0.77; // Step 5: Servo Retract + settle
+      const t7 = 0.94; // Step 6: Simultaneous Home
 
       s.xDir = 0; s.zDir = 0; s.forkDir = 0;
       s.servoState = 'STOP';
@@ -824,26 +1259,30 @@
       s.tempHideShelfBox = null;
 
       if (u < t1) {
-        s.xRev = 0; s.zRev = 0; s.forkExt = 0;
+        s.xVis = 0; s.zVis = 0; s.xRev = 0; s.zRev = 0; s.forkExt = 0;
         s.stepStage = 0; s.running = false;
         s.carriedBox = isStore;
         s.statusMsg = `DISPATCH -> ${isStore ? 'STORE' : 'RETRIEVE'}:${d.bayId}`;
       } else if (u < t2) {
         const m = trapMotion((u - t1) / (t2 - t1), 0.22);
-        s.xRev = tx * m.pos; s.zRev = 0; s.forkExt = 0;
+        s.xVis = txVis * m.pos; s.zVis = 0;
+        s.xRev = d.txRev * m.pos; s.zRev = 0; s.forkExt = 0;
         s.stepStage = 1; s.running = true; s.xDir = 1;
         s.carriedBox = isStore;
-        s.statusMsg = `STEP 1/6: MOVING X -> ${d.bayId} (${tx.toFixed(1)} rev)`;
+        s.statusMsg = `STEP 1/6: MOVING X -> ${d.bayId} (${d.txRev.toFixed(1)} rev)`;
       } else if (u < t3) {
         const m = trapMotion((u - t2) / (t3 - t2), 0.22);
-        s.xRev = tx; s.zRev = tz * m.pos; s.forkExt = 0;
+        const zGoalVis = isStore ? zHoverVis : zSeatVis;
+        s.xVis = txVis; s.zVis = zGoalVis * m.pos;
+        s.xRev = d.txRev; s.zRev = d.tzRev * m.pos; s.forkExt = 0;
         s.stepStage = 2; s.running = true; s.zDir = 1;
         s.carriedBox = isStore;
-        s.statusMsg = `STEP 2/6: MOVING Z -> ${d.bayId} (${tz.toFixed(1)} rev)`;
+        s.statusMsg = `STEP 2/6: MOVING Z -> ${d.bayId} (${d.tzRev.toFixed(1)} rev)`;
       } else if (u < t4) {
         const frac = (u - t3) / (t4 - t3);
         const settling = frac >= 0.86;
-        s.xRev = tx; s.zRev = tz;
+        s.xVis = txVis; s.zVis = isStore ? zHoverVis : zSeatVis;
+        s.xRev = d.txRev; s.zRev = d.tzRev;
         s.forkExt = easeInOut(clamp(frac / 0.86, 0, 1));
         s.stepStage = 3; s.running = true;
         s.servoState = settling ? 'STOP' : 'EXTEND';
@@ -852,15 +1291,17 @@
         s.statusMsg = settling ? 'STEP 3/6: SERVO SETTLE (150ms)' : 'STEP 3/6: SERVO EXTEND (2000us)';
       } else if (u < t5) {
         const m = trapMotion((u - t4) / (t5 - t4), 0.28);
-        s.xRev = tx; s.forkExt = 1.0;
+        s.xVis = txVis; s.xRev = d.txRev; s.forkExt = 1.0;
         s.stepStage = 4; s.running = true;
         if (isStore) {
-          s.zRev = tz - zOff * m.pos;
+          s.zVis = zHoverVis - VISUAL_LIFT_REV * m.pos;
+          s.zRev = d.tzRev - zOff * m.pos;
           s.zDir = -1;
           s.carriedBox = true;
           s.statusMsg = `STEP 4/6: Z DROP (-${zOff.toFixed(2)}r) -> ${d.bayId}`;
         } else {
-          s.zRev = tz + zOff * m.pos;
+          s.zVis = zSeatVis + VISUAL_LIFT_REV * m.pos;
+          s.zRev = d.tzRev + zOff * m.pos;
           s.zDir = 1;
           s.carriedBox = true;
           s.tempHideShelfBox = d.bayId;
@@ -869,8 +1310,9 @@
       } else if (u < t6) {
         const frac = (u - t5) / (t6 - t5);
         const settling = frac >= 0.86;
-        s.xRev = tx;
-        s.zRev = isStore ? (tz - zOff) : (tz + zOff);
+        s.xVis = txVis; s.xRev = d.txRev;
+        s.zVis = isStore ? zSeatVis : zHoverVis;
+        s.zRev = isStore ? (d.tzRev - zOff) : (d.tzRev + zOff);
         s.forkExt = 1.0 - easeInOut(clamp(frac / 0.86, 0, 1));
         s.stepStage = 5; s.running = true;
         s.servoState = settling ? 'STOP' : 'RETRACT';
@@ -884,15 +1326,18 @@
         }
         s.statusMsg = settling ? 'STEP 5/6: SERVO SETTLE (150ms)' : 'STEP 5/6: SERVO RETRACT (1000us)';
       } else if (u < t7) {
-        const zStart = isStore ? (tz - zOff) : (tz + zOff);
-        const maxDist = Math.max(tx, zStart, 0.1);
+        const zStartVis = isStore ? zSeatVis : zHoverVis;
+        const zStartRev = isStore ? Math.max(0, d.tzRev - zOff) : (d.tzRev + zOff);
+        const maxDist = Math.max(txVis, zStartVis, 0.1);
         const frac = (u - t6) / (t7 - t6);
-        const ux = clamp(frac / (tx / maxDist), 0, 1);
-        const uz = clamp(frac / (zStart / maxDist), 0, 1);
+        const ux = clamp(frac / (txVis / maxDist), 0, 1);
+        const uz = clamp(frac / (zStartVis / maxDist), 0, 1);
         const mx = trapMotion(ux, 0.22);
         const mz = trapMotion(uz, 0.22);
-        s.xRev = tx * (1 - mx.pos);
-        s.zRev = zStart * (1 - mz.pos);
+        s.xVis = txVis * (1 - mx.pos);
+        s.zVis = zStartVis * (1 - mz.pos);
+        s.xRev = d.txRev * (1 - mx.pos);
+        s.zRev = zStartRev * (1 - mz.pos);
         s.forkExt = 0;
         s.stepStage = 6; s.running = true;
         s.xDir = ux < 1 ? -1 : 0;
@@ -901,7 +1346,7 @@
         else { s.carriedBox = true; s.tempHideShelfBox = d.bayId; }
         s.statusMsg = 'STEP 6/6: RETURNING HOME (0,0)';
       } else {
-        s.xRev = 0; s.zRev = 0; s.forkExt = 0;
+        s.xVis = 0; s.zVis = 0; s.xRev = 0; s.zRev = 0; s.forkExt = 0;
         s.stepStage = 0; s.running = false;
         if (!d.committed) {
           this.occ[d.bayId] = isStore;
@@ -918,52 +1363,8 @@
     }
 
     // -------------------------------------------------------------------------
-    // 5. COORDINATE NORMALIZATION (SUPPORTS CUSTOM WMS BOX_COORDINATES!)
-    // -------------------------------------------------------------------------
-    _normalizeX(rawX) {
-      // Compute current average X per column from configured coordinates
-      const c1 = (this.coordinates.A1.x + this.coordinates.B1.x + this.coordinates.C1.x) / 3 || 2.0;
-      const c2 = (this.coordinates.A2.x + this.coordinates.B2.x + this.coordinates.C2.x) / 3 || 5.0;
-      const c3 = (this.coordinates.A3.x + this.coordinates.B3.x + this.coordinates.C3.x) / 3 || 8.0;
-      if (rawX <= c1) return (rawX / (c1 || 2.0)) * 2.0;
-      if (rawX <= c2) return 2.0 + ((rawX - c1) / Math.max(0.1, c2 - c1)) * 3.0;
-      return 5.0 + ((rawX - c2) / Math.max(0.1, c3 - c2)) * 3.0;
-    }
-
-    _mapVisualZ(rawZ) {
-      const s = this.state;
-      if (s.zVisOverride !== null) return s.zVisOverride;
-
-      // Normalize configured row Z heights onto canonical visual rows (1.5, 4.0, 6.5)
-      const rA = (this.coordinates.A1.z + this.coordinates.A2.z + this.coordinates.A3.z) / 3 || 1.5;
-      const rB = (this.coordinates.B1.z + this.coordinates.B2.z + this.coordinates.B3.z) / 3 || 4.0;
-      const rC = (this.coordinates.C1.z + this.coordinates.C2.z + this.coordinates.C3.z) / 3 || 6.5;
-
-      let zNorm;
-      if (rawZ <= rA) zNorm = (rawZ / (rA || 1.5)) * 1.5;
-      else if (rawZ <= rB) zNorm = 1.5 + ((rawZ - rA) / Math.max(0.1, rB - rA)) * 2.5;
-      else zNorm = 4.0 + ((rawZ - rB) / Math.max(0.1, rC - rB)) * 2.5;
-
-      const b = s.targetBay ? BAY_INFO[s.targetBay] : null;
-      const zOff = s.zOffsetRev || 0.40;
-      if (!b) return clamp(zNorm * (6.10 / 6.50), 0, 6.55);
-
-      const baseZ = b.zRev;          // 1.50 | 4.00 | 6.50
-      const seatedZ = baseZ - 0.40;  // 1.10 | 3.60 | 6.10
-      if (s.op === 'STORAGE') {
-        // Approaches hovering +0.40 above shelf, then drops -0.40 onto shelf floor
-        const delta = zNorm - baseZ;
-        return clamp(baseZ + delta * (0.40 / Math.max(0.05, zOff)), 0, 6.60);
-      } else if (s.op === 'RETRIEVAL') {
-        // Approaches at seated height (fork enters under pallet), then lifts +0.40 off shelf
-        if (zNorm <= baseZ) return clamp(zNorm * (seatedZ / baseZ), 0, 6.50);
-        return clamp(seatedZ + (zNorm - baseZ) * (0.40 / Math.max(0.05, zOff)), 0, 6.60);
-      }
-      return clamp(zNorm * (6.10 / 6.50), 0, 6.55);
-    }
-
-    // -------------------------------------------------------------------------
-    // 6. 14-LAYER PAINTER'S ALGORITHM 2.5D RENDERER
+    // 6. TRUE ISOMETRIC COL-BY-COL x ROW-BY-ROW PAINTER'S RENDERER
+    //    (ZERO WALL SLICING, ZERO CEILING CHOPPING, ZERO FORK PIERCING!)
     // -------------------------------------------------------------------------
     renderNow() {
       const c = this.ctx;
@@ -1018,52 +1419,51 @@
         c.fillRect(NATIVE_W - 110, 0, 120, NATIVE_H);
       }
 
-      // LAYER 2: Interactive Bay Highlights (Selected / Hovered / Active Operation)
+      // LAYER 2: Interactive Bay Quad Highlights (Selected / Hovered / Active Operation)
       this._drawBayHighlights(c, t);
 
       // Compute current gantry, carriage & carried-box geometry
-      const xVis = this._normalizeX(s.xRev);
-      const zVis = this._mapVisualZ(s.zRev);
+      const xVis = s.xVis;
+      const zVis = s.zVis;
       const { xL, yL, xR, yR } = getBeamEndpoints(zVis);
       const { cx, beamY } = getCarriagePos(xVis, zVis);
 
+      const perspDx = getCarriedPerspDx(xVis);
       const perspDy = getCarriedPerspDy(xVis, zVis);
-      const forkDx = 30;
-      const forkDy = -15;
-      const carriedBoxX = (cx - 8) - (1 - s.forkExt) * forkDx;
-      const carriedBoxY = (beamY + perspDy) - (1 - s.forkExt) * forkDy;
+      const carriedBoxX = (cx + perspDx) - (1 - s.forkExt) * FORK_TRAVEL_DX;
+      const carriedBoxY = (beamY + perspDy) - (1 - s.forkExt) * FORK_TRAVEL_DY;
 
-      // Determine whether the carried box is currently slotted INSIDE a specific row
-      const insideRow = (s.forkExt > 0.35 && s.targetBay && BAY_INFO[s.targetBay])
-        ? BAY_INFO[s.targetBay].row
+      // Determine exact cubby the fork is currently entering/inside (smooth from forkExt > 0.08)
+      const activeInsideBay = (s.forkExt > 0.08 && s.targetBay && BAY_INFO[s.targetBay])
+        ? s.targetBay
         : null;
 
-      // LAYERS 3–8: Bottom-to-Top Row Painter's Order with Interleaved 3D Shelf Occlusion
-      // Row A boxes -> (optional inside-Row-A fork+box) -> Shelf A ceiling lip
-      this._drawShelfRow(c, 'A');
-      if (insideRow === 'A') this._drawForkAndCarriedBox(c, cx, beamY, s.forkExt, carriedBoxX, carriedBoxY);
-      c.drawImage(this.assets.maskShelfA, 330, 415);
-
-      // Row B boxes -> (optional inside-Row-B fork+box) -> Shelf B ceiling lip
-      this._drawShelfRow(c, 'B');
-      if (insideRow === 'B') this._drawForkAndCarriedBox(c, cx, beamY, s.forkExt, carriedBoxX, carriedBoxY);
-      c.drawImage(this.assets.maskShelfB, 330, 250);
-
-      // Row C boxes -> (optional inside-Row-C fork+box) -> Top cabinet roof lip
-      this._drawShelfRow(c, 'C');
-      if (insideRow === 'C') this._drawForkAndCarriedBox(c, cx, beamY, s.forkExt, carriedBoxX, carriedBoxY);
-      c.drawImage(this.assets.maskRoofC, 330, 70);
-
-      // LAYER 9: Full-Height Vertical Column Divider Masks (Wall 1 & Wall 2)
-      c.drawImage(this.assets.maskWall1, 454, 154);
-      c.drawImage(this.assets.maskWall2, 576, 208);
-
-      // If fork is retracted / travelling outside the rack, draw fork + carried box IN FRONT of all dividers & shelves
-      if (!insideRow) {
-        this._drawForkAndCarriedBox(c, cx, beamY, s.forkExt, carriedBoxX, carriedBoxY);
+      // LAYERS 3–9: TRUE BACK-TO-FRONT ISOMETRIC PAINTER'S ORDER
+      // Col 1 (A1 -> ShelfA1 -> B1 -> ShelfB1 -> C1 -> RoofC1) -> Wall 1 ->
+      // Col 2 (A2 -> ShelfA2 -> B2 -> ShelfB2 -> C2 -> RoofC2) -> Wall 2 ->
+      // Col 3 (A3 -> ShelfA3 -> B3 -> ShelfB3 -> C3 -> RoofC3)
+      for (const col of [1, 2, 3]) {
+        for (const row of ['A', 'B', 'C']) {
+          const bayId = `${row}${col}`;
+          if (this._isBayVisuallyStocked(bayId)) {
+            this._drawBayBox(c, bayId);
+          }
+          if (activeInsideBay === bayId) {
+            this._drawForkAndCarriedBox(c, cx, beamY, s.forkExt, carriedBoxX, carriedBoxY);
+          }
+          this._drawShelfMaskForCol(c, row, col);
+        }
+        if (col === 1) c.drawImage(this.assets.maskWall1, 454, 154);
+        if (col === 2) c.drawImage(this.assets.maskWall2, 576, 208);
       }
 
-      // LAYER 10: Fixed Outer Frame Occlusion (Top Crossbar + Right Frame / Pulley / Rail)
+      // If fork is retracted / travelling outside the rack in the front corridor,
+      // draw fork + carried box cleanly IN FRONT OF all 9 cubbies and both dividers!
+      if (!activeInsideBay) {
+        this._drawForkAndCarriedBox(c, cx, beamY, s.forkExt, carriedBoxX, carriedBoxY, true);
+      }
+
+      // LAYER 10: Fixed Outer Frame Occlusion (Top Crossbar + Right Vertical Frame / Pulley / Rail)
       c.drawImage(this.assets.maskTopBar, 270, 139);
       c.drawImage(this.assets.maskRightFrame, 658, 270);
 
@@ -1099,7 +1499,6 @@
 
       c.restore(); // exit 1200x896 CAD space
 
-      // Optional crisp HTML-style HUD overlay chips rendered right on canvas
       if (this.options.showTopChips) this._drawTopOverlayChips(c, width);
       if (this.options.showLegend) this._drawBottomLegend(c, width, height);
 
@@ -1113,39 +1512,52 @@
       return !!this.occ[id];
     }
 
-    _drawShelfRow(c, rowKey) {
-      const ids = ROW_BAYS[rowKey];
-      for (const id of ids) {
-        if (!this._isBayVisuallyStocked(id)) continue;
-        const p = BAY_INFO[id].boxRest;
-        // Soft ambient contact shadow tucked cleanly beneath wooden pallet feet
-        c.save();
-        c.fillStyle = 'rgba(0, 0, 0, 0.34)';
-        c.shadowColor = 'rgba(0, 0, 0, 0.45)';
-        c.shadowBlur = 8;
-        c.beginPath();
-        c.moveTo(p.x + 12, p.y + 116);
-        c.lineTo(p.x + 84, p.y + 148);
-        c.lineTo(p.x + 92, p.y + 136);
-        c.lineTo(p.x + 24, p.y + 106);
-        c.closePath();
-        c.fill();
-        c.restore();
-
-        c.drawImage(this.assets.boxBay, p.x, p.y);
-      }
+    _drawBayBox(c, id) {
+      const p = BAY_INFO[id].boxRest;
+      // Soft ambient contact shadow tucked cleanly beneath wooden pallet feet
+      c.save();
+      c.fillStyle = 'rgba(0, 0, 0, 0.34)';
+      c.shadowColor = 'rgba(0, 0, 0, 0.45)';
+      c.shadowBlur = 8;
+      c.beginPath();
+      c.moveTo(p.x + 12, p.y + 116);
+      c.lineTo(p.x + 84, p.y + 148);
+      c.lineTo(p.x + 92, p.y + 136);
+      c.lineTo(p.x + 24, p.y + 106);
+      c.closePath();
+      c.fill();
+      c.restore();
+      c.drawImage(this.assets.boxBay, p.x, p.y);
     }
 
-    _drawForkAndCarriedBox(c, cx, beamY, forkExt, carriedBoxX, carriedBoxY) {
-      this._drawForkAssembly(c, cx, beamY, forkExt);
+    _drawShelfMaskForCol(c, row, col) {
+      const [x0, x1] = COL_CLIP_X[col];
+      c.save();
+      c.beginPath();
+      c.rect(x0, 0, x1 - x0, NATIVE_H);
+      c.clip();
+      if (row === 'A') c.drawImage(this.assets.maskShelfA, 330, 415);
+      else if (row === 'B') c.drawImage(this.assets.maskShelfB, 330, 250);
+      else if (row === 'C') c.drawImage(this.assets.maskRoofC, 330, 70);
+      c.restore();
+    }
+
+    _drawForkAndCarriedBox(c, cx, beamY, forkExt, carriedBoxX, carriedBoxY, inCorridor = false) {
+      this._drawForkAssembly(c, cx, beamY, forkExt, carriedBoxY);
       if (this.state.carriedBox) {
         c.save();
-        c.fillStyle = 'rgba(0, 0, 0, 0.25)';
+        c.fillStyle = 'rgba(0, 0, 0, 0.24)';
         c.beginPath();
-        c.ellipse(carriedBoxX + 52, carriedBoxY + 130, 36, 12, 0.38, 0, Math.PI * 2);
+        c.ellipse(carriedBoxX + 50, carriedBoxY + 132, 34, 11, 0.38, 0, Math.PI * 2);
         c.fill();
-        c.restore();
+        if (inCorridor) {
+          c.shadowColor = 'rgba(0, 0, 0, 0.48)';
+          c.shadowBlur = 14;
+          c.shadowOffsetX = 6;
+          c.shadowOffsetY = 6;
+        }
         c.drawImage(this.assets.boxCarry, carriedBoxX, carriedBoxY);
+        c.restore();
       }
     }
 
@@ -1220,50 +1632,55 @@
       }
     }
 
-    _drawForkAssembly(c, cx, beamY, forkExt) {
-      const extLen = 36 + forkExt * 68;
-      const bx = cx + 22;
-      const by = beamY + 56;
+    _drawForkAssembly(c, cx, beamY, forkExt, carriedBoxY) {
+      // Compact physically-accurate telescopic stroke (max 54px so prongs stay 100% inside target bay!)
+      const extLen = 14 + forkExt * 40;
+      const bx = cx + 14;
+      const by = beamY + 46;
       c.save();
 
-      // Blue 360° continuous rotation servo housing behind carriage
+      // Blue 360° continuous rotation servo housing tucked cleanly behind carriage plate
       c.fillStyle = '#1D4ED8';
       c.strokeStyle = '#0F172A';
       c.lineWidth = 1.5;
       c.beginPath();
-      c.moveTo(bx - 12, by - 44); c.lineTo(bx + 18, by - 58);
-      c.lineTo(bx + 18, by - 8);  c.lineTo(bx - 12, by + 6);
+      c.moveTo(bx - 10, by - 40); c.lineTo(bx + 14, by - 52);
+      c.lineTo(bx + 14, by - 8);  c.lineTo(bx - 10, by + 4);
       c.closePath();
       c.fill(); c.stroke();
 
       c.fillStyle = '#3B82F6';
       c.beginPath();
-      c.moveTo(bx - 12, by - 44); c.lineTo(bx + 18, by - 58);
-      c.lineTo(bx + 8, by - 63);  c.lineTo(bx - 22, by - 49);
+      c.moveTo(bx - 10, by - 40); c.lineTo(bx + 14, by - 52);
+      c.lineTo(bx + 6, by - 56);  c.lineTo(bx - 18, by - 44);
       c.closePath();
       c.fill();
 
-      // Dual telescopic stainless-steel fork prongs
-      for (const p of [{ ox: -16, oy: -4 }, { ox: 12, oy: 9 }]) {
-        const px0 = bx + p.ox, py0 = by + p.oy;
-        const px1 = px0 + DEPTH_UX * extLen, py1 = py0 + DEPTH_UY * extLen;
+      // Dual stainless-steel fork prongs aligned cleanly into wooden pallet fork-pockets
+      const forkBaseY = (carriedBoxY !== undefined) ? (carriedBoxY + 128) : (by + 4);
+      for (const p of [{ ox: -10, oy: -4 }, { ox: 12, oy: 6 }]) {
+        const px0 = bx + p.ox;
+        const py0 = forkBaseY + p.oy;
+        const px1 = px0 + DEPTH_UX * extLen;
+        const py1 = py0 + DEPTH_UY * extLen;
+
         c.strokeStyle = '#475569';
-        c.lineWidth = 11;
+        c.lineWidth = 9;
         c.lineCap = 'butt';
-        c.beginPath(); c.moveTo(px0, py0 + 3); c.lineTo(px1, py1 + 3); c.stroke();
+        c.beginPath(); c.moveTo(px0, py0 + 2.5); c.lineTo(px1, py1 + 2.5); c.stroke();
 
         const grad = c.createLinearGradient(px0, py0, px1, py1);
         grad.addColorStop(0, '#CBD5E1');
         grad.addColorStop(0.5, '#F1F5F9');
         grad.addColorStop(1, '#94A3B8');
         c.strokeStyle = grad;
-        c.lineWidth = 8;
+        c.lineWidth = 6.5;
         c.beginPath(); c.moveTo(px0, py0); c.lineTo(px1, py1); c.stroke();
 
         if (forkExt > 0.02 && forkExt < 0.98) {
           c.strokeStyle = 'rgba(45, 212, 191, 0.88)';
-          c.lineWidth = 2;
-          c.beginPath(); c.moveTo(px0, py0 - 3); c.lineTo(px1, py1 - 3); c.stroke();
+          c.lineWidth = 1.8;
+          c.beginPath(); c.moveTo(px0, py0 - 2.5); c.lineTo(px1, py1 - 2.5); c.stroke();
         }
       }
       c.restore();
@@ -1287,7 +1704,7 @@
         xPos += segW;
       }
 
-      // Animated GT2 blue timing belt teeth synced with X-axis revolutions
+      // Animated GT2 blue timing belt teeth synced with X-axis travel
       c.save();
       c.beginPath();
       c.rect(8, -7, drawLen - 16, 8);
@@ -1356,7 +1773,7 @@
         const y2 = beamY - 94 + (x2 - cx) * slope;
         const xLbl = s.op === 'HOMING'
           ? 'HOMING X'
-          : (s.xDir > 0 ? `X -> ${s.targetBay || s.targetXRev.toFixed(1) + 'r'}` : 'X -> HOME');
+          : (s.xDir > 0 ? `X -> ${s.targetBay || s.goalXRev.toFixed(1) + 'r'}` : 'X -> HOME');
         this._drawGlowArrow(c, x1, y1, x2, y2, '#3B82F6', '#60A5FA', t, xLbl, -44, 0);
         this._drawSpinArc(c, 232, yL - 8, 28, s.xDir, t, '#60A5FA');
       }
@@ -1365,7 +1782,7 @@
         const y1 = zMidY + s.zDir * 76, y2 = zMidY - s.zDir * 76;
         let zLbl = s.op === 'HOMING'
           ? 'HOMING Z'
-          : (s.zDir > 0 ? `Z -> ${s.targetBay || s.targetZRev.toFixed(1) + 'r'}` : 'Z -> HOME');
+          : (s.zDir > 0 ? `Z -> ${s.targetBay || s.goalZRev.toFixed(1) + 'r'}` : 'Z -> HOME');
         if (s.stepStage === 4) {
           zLbl = s.op === 'STORAGE'
             ? `Z DROP -${s.zOffsetRev.toFixed(2)}r`
@@ -1414,7 +1831,6 @@
       c.globalAlpha = 0.88; c.fill();
       c.globalAlpha = 1.0;  c.stroke();
 
-      // Animated traveling chevrons along arrow shaft
       c.shadowBlur = 0;
       c.strokeStyle = 'rgba(255,255,255,0.94)';
       c.lineWidth = 3;
@@ -1479,11 +1895,9 @@
     _drawMcuLeds(c) {
       const s = this.state;
       c.save();
-      // Power LED (green)
       c.fillStyle = '#4ADE80'; c.shadowColor = '#4ADE80'; c.shadowBlur = 10;
       c.beginPath(); c.arc(888, 369, 4.2, 0, Math.PI * 2); c.fill();
 
-      // IND1/IND2 (GPIO 15/2): Red when E-Stop locked, Lime when running
       if (s.locked) {
         c.fillStyle = '#FF4D4F'; c.shadowColor = '#FF4D4F'; c.shadowBlur = 18;
         c.beginPath(); c.arc(866, 378, 6.2, 0, Math.PI * 2); c.fill();
@@ -1492,7 +1906,6 @@
         c.beginPath(); c.arc(866, 378, 5.2, 0, Math.PI * 2); c.fill();
       }
 
-      // Firebase RTDB Sync LED (cyan pulse)
       if (s._rtdbActive) {
         c.fillStyle = '#38BDF8'; c.shadowColor = '#38BDF8'; c.shadowBlur = 14;
         c.beginPath(); c.arc(908, 360, 4.5, 0, Math.PI * 2); c.fill();
@@ -1502,7 +1915,7 @@
 
     _drawHomeMarker(c) {
       const s = this.state;
-      const atHome = (s.xRev < 0.05 && s.zRev < 0.05);
+      const atHome = (s.xVis < 0.08 && s.zVis < 0.08);
       c.save();
       c.strokeStyle = atHome ? '#AFFF00' : 'rgba(15, 23, 42, 0.55)';
       c.lineWidth = 2.2;
@@ -1571,13 +1984,12 @@
       const pillH = 24;
       c.font = '700 10px "JetBrains Mono", "Liberation Mono", monospace';
 
-      // Left status chip
       const isBusy = s.running || s.stepStage > 0;
       const modeTag = s.locked
         ? 'SAFETY LOCK · E-STOP'
         : (s.stepStage > 0
           ? `STEP ${s.stepStage}/6 · ${s.op}`
-          : (isBusy && s.op && s.op !== 'NONE' && s.op !== 'IDLE' ? `DIGITAL TWIN · ${s.op}` : 'LIVE DIGITAL TWIN · STANDBY'));
+          : (isBusy && s.op && s.op !== 'NONE' && s.op !== 'IDLE' ? `LIVE · ${s.op}` : 'LIVE DIGITAL TWIN · STANDBY'));
       const leftW = Math.min(w * 0.54, c.measureText(modeTag).width + 28);
       roundRect(c, 10, 10, leftW, pillH, 7);
       c.fillStyle = s.locked ? 'rgba(185, 28, 28, 0.92)' : 'rgba(15, 23, 42, 0.84)';
@@ -1586,7 +1998,7 @@
       c.lineWidth = 1;
       c.stroke();
 
-      const dotCol = s.locked ? '#FF4D4F' : (s.running ? '#FFEA00' : '#AFFF00');
+      const dotCol = s.locked ? '#FF4D4F' : (isBusy ? '#FFEA00' : '#AFFF00');
       c.fillStyle = dotCol;
       c.beginPath(); c.arc(21, 22, 3.6, 0, Math.PI * 2); c.fill();
       c.fillStyle = '#FFFFFF';
@@ -1594,10 +2006,9 @@
       c.textBaseline = 'middle';
       c.fillText(modeTag, 30, 22.5);
 
-      // Right target / live coordinates chip
       const bayId = (isBusy && s.targetBay) ? s.targetBay : (s.selectedBay || s.targetBay || 'A1');
       const bc = this.coordinates[bayId] || BAY_INFO[bayId];
-      const rightTxt = s.running
+      const rightTxt = isBusy
         ? `X:${s.xRev.toFixed(2)}r · Z:${s.zRev.toFixed(2)}r`
         : `TARGET: ${bayId} (X ${bc.x.toFixed(1)} · Z ${bc.z.toFixed(1)})`;
       const rightW = c.measureText(rightTxt).width + 18;
@@ -1606,7 +2017,7 @@
       c.fill();
       c.strokeStyle = 'rgba(255,255,255,0.20)';
       c.stroke();
-      c.fillStyle = s.running ? '#AFFF00' : '#FFFFFF';
+      c.fillStyle = isBusy ? '#AFFF00' : '#FFFFFF';
       c.textAlign = 'center';
       c.fillText(rightTxt, w - rightW / 2 - 10, 22.5);
       c.restore();
@@ -1645,7 +2056,6 @@
     }
   }
 
-  // Expose static constants & helpers for custom WMS integrations
   AsrsCadTwin.BAY_INFO = BAY_INFO;
   AsrsCadTwin.ASSET_MANIFEST = ASSET_MANIFEST;
   AsrsCadTwin.getBeamEndpoints = getBeamEndpoints;
