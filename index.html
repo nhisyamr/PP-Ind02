@@ -1304,7 +1304,7 @@
   <!-- ======================================================================= -->
   <!-- 2.5D PHOTOREALISTIC CAD DIGITAL TWIN ENGINE                             -->
   <!-- ======================================================================= -->
-  <script src="./asrs_cad_widget/asrs-cad-twin.js"></script>
+  <script src="./asrs_cad_widget/asrs-cad-twin.js?v=2.1"></script>
 
   <!-- ======================================================================= -->
   <!-- APPLICATION LOGIC, FIFO AUTO-ALLOCATION & FIREBASE CONFIG PERSISTENCE   -->
@@ -2262,17 +2262,27 @@
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         appendLog(`Delivered: "${cleanCmd}"`, "success");
-        if (asrsTwin) {
-          cadSimActive = false;
-          const simBtn = document.getElementById("cadSimBtn");
-          if (simBtn) simBtn.classList.remove("active");
-          asrsTwin.notifyCommand(cleanCmd);
-        }
-        return true;
       } catch (err) {
         appendLog(`Command failed: ${err.message}`, "error");
         return false;
       }
+
+      // Notify 3D Digital Twin independently so a cached script or UI error can never
+      // cause a delivered Firebase command to report "Failed to dispatch"
+      try {
+        if (asrsTwin) {
+          cadSimActive = false;
+          const simBtn = document.getElementById("cadSimBtn");
+          if (simBtn) simBtn.classList.remove("active");
+          if (typeof asrsTwin.notifyCommand === "function") {
+            asrsTwin.notifyCommand(cleanCmd);
+          }
+        }
+      } catch (twinErr) {
+        console.warn("[AsrsCadTwin] notifyCommand skipped:", twinErr);
+      }
+
+      return true;
     }
 
     function sendRevolutionCommand() {
