@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Proyek Perancangan IND-02 — Automatic Storage and Retrieval System</title>
-  <meta name="description" content="Proyek Perancangan IND-02 Automatic Storage and Retrieval System (ASRS) Industrial HMI with FIFO Auto Mode, Product Management, and ESP32 Motion Control." />
-  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <meta name="description" content="Proyek Perancangan IND-02 Automatic Storage and Retrieval System (ASRS) Industrial HMI with FIFO Auto Mode, Product Management, Retrieval Z-Axis Offset (A), and ESP32 Motion Control." />
+  <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -66,7 +66,6 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* Animated Industrial Header Gradient */
     @keyframes industrialHeaderGradient {
       0%   { background-position: 0% 50%; }
       50%  { background-position: 100% 50%; }
@@ -89,7 +88,6 @@
       }
     }
 
-    /* Glass & Surface Containers */
     .glass-pill {
       background: rgba(255, 255, 255, 0.62);
       backdrop-filter: blur(12px);
@@ -143,7 +141,6 @@
       position: relative;
     }
 
-    /* Buttons */
     .btn-primary {
       background: #000000;
       color: #FFFFFF;
@@ -199,7 +196,6 @@
       cursor: not-allowed;
     }
 
-    /* Header View Switcher Pills */
     .view-switcher-btn {
       height: 32px;
       padding: 0 12px;
@@ -228,7 +224,6 @@
       color: #FFFFFF;
     }
 
-    /* Single Segmented Toggle (Manual | Auto FIFO) */
     .mode-pill-btn {
       height: 30px;
       padding: 0 12px;
@@ -256,7 +251,6 @@
       color: #000000;
     }
 
-    /* Settings Sub-Tabs */
     .folder-tab {
       height: 34px;
       padding: 0 14px;
@@ -286,7 +280,6 @@
       color: #000000;
     }
 
-    /* Categorical Pill Badges */
     .cat-badge {
       min-width: 50px;
       height: 22px;
@@ -310,7 +303,6 @@
     .badge-coral  { background: #FF4D4F; color: #FFFFFF; }
     .badge-muted  { background: #E2E5E9; color: #5C646C; }
 
-    /* Simplified Rack Matrix Cell (No X/Z Coordinate Clutter) */
     .rack-slot-cell {
       border-radius: var(--radius-md);
       padding: 8px 10px;
@@ -345,83 +337,6 @@
       border-color: #5C646C;
     }
 
-    /* Integrated 3D CAD Digital Twin + Rack Matrix Workspace */
-    .cad-workspace-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 10px;
-      flex: 1 1 0%;
-      min-height: 0;
-    }
-    @media (min-width: 768px) {
-      .cad-workspace-grid.mode-split {
-        grid-template-columns: minmax(280px, 46%) minmax(0, 54%);
-      }
-    }
-    .cad-workspace-grid.mode-3d #rackMatrixPane {
-      display: none;
-    }
-    .cad-workspace-grid.mode-matrix #cadTwinPane {
-      display: none;
-    }
-    .cad-workspace-grid.mode-split .rack-slot-cell {
-      padding: 6px 8px;
-      min-height: 54px;
-    }
-
-    .cad-twin-pane {
-      position: relative;
-      background: #DFDFDF;
-      border-radius: 12px;
-      border: 1.5px solid rgba(255, 255, 255, 0.92);
-      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
-      overflow: hidden;
-      min-height: 270px;
-      display: flex;
-      flex-direction: column;
-    }
-    .cad-twin-pane canvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-      flex: 1 1 0%;
-    }
-    .cad-mini-controls {
-      position: absolute;
-      right: 10px;
-      bottom: 38px;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      z-index: 5;
-    }
-    .cad-mini-btn {
-      height: 22px;
-      padding: 0 7px;
-      border-radius: 6px;
-      background: rgba(15, 23, 42, 0.82);
-      color: #E2E8F0;
-      border: 1px solid rgba(255, 255, 255, 0.24);
-      font-size: 10px;
-      font-weight: 600;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-      transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
-    }
-    .cad-mini-btn:hover {
-      background: rgba(15, 23, 42, 0.96);
-      color: #FFFFFF;
-      border-color: rgba(255, 255, 255, 0.45);
-    }
-    .cad-mini-btn.active {
-      background: #AFFF00;
-      color: #000000;
-      border-color: #84CC16;
-    }
-
-    /* Custom Scrollbar */
     ::-webkit-scrollbar {
       width: 4px;
       height: 4px;
@@ -446,10 +361,9 @@
   <div class="max-w-[1440px] w-full mx-auto flex-1 flex flex-col gap-2.5 lg:min-h-0">
 
     <!-- ===================================================================== -->
-    <!-- COMPACT SINGLE-BAR HEADER (~52-56px height, zero subtitle clutter)    -->
+    <!-- COMPACT SINGLE-BAR HEADER (~54px height, zero subtitle clutter)       -->
     <!-- ===================================================================== -->
     <header class="animated-header-card min-h-[52px] lg:h-[54px] px-3.5 py-2 shrink-0 flex flex-wrap items-center justify-between gap-2">
-      <!-- 1. System Title Only (No Subtitle) -->
       <div class="flex items-center gap-2.5 min-w-0">
         <div class="w-8 h-8 rounded-[8px] bg-white/15 border border-white/25 text-[#AFFF00] flex items-center justify-center font-bold text-xs tracking-tight shrink-0 mono">
           IND02
@@ -463,9 +377,7 @@
         </div>
       </div>
 
-      <!-- 2. View Switcher + Compact Status Indicators + Emergency Stop -->
       <div class="flex flex-wrap items-center gap-2 ml-auto">
-        <!-- View Switcher (Operator | Settings & Setup) -->
         <nav class="header-glass-pill p-0.5 rounded-[8px] flex items-center gap-1" role="tablist" aria-label="Primary View">
           <button id="viewTab-operator" onclick="switchPrimaryView('operator')"
             role="tab" aria-selected="true" aria-controls="viewPanel-operator"
@@ -481,7 +393,6 @@
           </button>
         </nav>
 
-        <!-- Compact RTDB & ESP32 Status Pill -->
         <div class="header-glass-pill h-[34px] px-2.5 rounded-[8px] flex items-center gap-2">
           <span id="connDot" class="w-2 h-2 rounded-full bg-[#FFBC5B]"></span>
           <span id="connStateText" class="text-[11px] font-semibold text-white mono">INIT</span>
@@ -489,7 +400,6 @@
           <span id="systemStatusBadge" class="cat-badge badge-mint !h-[20px] !min-w-[54px] !text-[10px]">STANDBY</span>
         </div>
 
-        <!-- Emergency Stop Button -->
         <button onclick="sendFirebaseCommand('E_STOP')"
           class="h-[34px] px-3 rounded-[8px] bg-[#FF4D4F] hover:bg-[#D93638] active:scale-98 text-white font-semibold text-[12px] inline-flex items-center gap-1.5 transition cursor-pointer shadow-sm"
           title="Emergency Stop & Engage Safety Lock (E_STOP)">
@@ -500,141 +410,97 @@
     </header>
 
     <!-- ===================================================================== -->
-    <!-- VIEW 1: OPERATOR MODE (FITS 100% INSIDE SINGLE DESKTOP VIEWPORT)      -->
-    <!-- Left Column: Rack Matrix (A1-C3) + Cycle Control (Merged with Slot)   -->
-    <!-- Right Column: Slot & Product Details (Optional) + Live Telemetry      -->
+    <!-- VIEW 1: OPERATOR MODE                                                 -->
     <!-- ===================================================================== -->
     <main id="viewPanel-operator" role="tabpanel" aria-labelledby="viewTab-operator"
       class="flex-1 lg:min-h-0 grid grid-cols-1 lg:grid-cols-12 gap-3 items-stretch">
 
-      <!-- ================================================================= -->
-      <!-- LEFT COLUMN (7 Cols): Rack Matrix (A1-C3) + Cycle Control         -->
-      <!-- ================================================================= -->
+      <!-- LEFT COLUMN (7 Cols): Rack Matrix (A1-C3) + Cycle Control -->
       <div class="lg:col-span-7 flex flex-col gap-2.5 lg:min-h-0">
 
-        <!-- PANEL 1: 3D DIGITAL TWIN & RACK MATRIX (A1-C3) -->
+        <!-- PANEL 1: RACK MATRIX (A1-C3) -->
         <section class="schematic-canvas p-3.5 flex-1 flex flex-col justify-between lg:min-h-0">
-          <!-- Header, View Switcher (Split | 3D Twin | Matrix) & Allocation Mode (Manual | Auto FIFO) -->
           <div class="flex flex-wrap items-center justify-between gap-2 shrink-0">
-            <div class="flex items-center gap-2">
-              <h2 class="text-[15px] font-bold text-black leading-none">3D Twin &amp; Rack Matrix</h2>
-              <span class="white-pill h-[24px] px-2 rounded-full inline-flex items-center gap-1.5 text-[11px]">
+            <div class="flex items-center gap-2.5">
+              <h2 class="text-[16px] font-bold text-black leading-none">Rack Matrix (A1–C3)</h2>
+              <span class="white-pill h-[26px] px-2.5 rounded-full inline-flex items-center gap-1.5 text-[11px]">
                 <span class="text-[#7A828A]">Occupied</span>
                 <strong id="occupiedCountBadge" class="mono text-black">0 / 9</strong>
               </span>
             </div>
 
-            <div class="flex flex-wrap items-center gap-1.5">
-              <!-- Visual View Switcher (Split | 3D Twin | Matrix) -->
-              <div class="glass-pill p-0.5 rounded-[8px] flex items-center gap-0.5" role="group" aria-label="Rack View Mode">
-                <button id="vizBtn-split" onclick="setRackVisualMode('split')" class="mode-pill-btn active-mode !h-[28px] !px-2.5 !text-[11px]">
-                  <span>Split</span>
-                </button>
-                <button id="vizBtn-3d" onclick="setRackVisualMode('3d')" class="mode-pill-btn inactive-mode !h-[28px] !px-2.5 !text-[11px]">
-                  <span>3D Twin</span>
-                </button>
-                <button id="vizBtn-matrix" onclick="setRackVisualMode('matrix')" class="mode-pill-btn inactive-mode !h-[28px] !px-2.5 !text-[11px]">
-                  <span>Matrix</span>
-                </button>
-              </div>
-
-              <!-- Single Segmented Mode Toggle (Manual vs Auto FIFO) -->
-              <div class="glass-pill p-0.5 rounded-[8px] flex items-center gap-0.5" role="group" aria-label="Allocation Mode">
-                <button id="modeBtn-MANUAL" onclick="setAllocationMode('MANUAL')" class="mode-pill-btn active-mode !h-[28px] !px-2.5 !text-[11px]">
-                  <span>Manual</span>
-                </button>
-                <button id="modeBtn-AUTO" onclick="setAllocationMode('AUTO')" class="mode-pill-btn inactive-mode !h-[28px] !px-2.5 !text-[11px]">
-                  <span class="w-1.5 h-1.5 rounded-full bg-[#52C41A]"></span>
-                  <span>Auto FIFO</span>
-                </button>
-              </div>
+            <div class="glass-pill p-0.5 rounded-[8px] flex items-center gap-0.5" role="group" aria-label="Allocation Mode">
+              <button id="modeBtn-MANUAL" onclick="setAllocationMode('MANUAL')" class="mode-pill-btn active-mode">
+                <span>Manual</span>
+              </button>
+              <button id="modeBtn-AUTO" onclick="setAllocationMode('AUTO')" class="mode-pill-btn inactive-mode">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#52C41A]"></span>
+                <span>Auto FIFO</span>
+              </button>
             </div>
           </div>
 
-          <!-- Full Rack Alert Banner (Hidden unless 9/9 occupied) -->
           <div id="fullRackAlertBanner" class="hidden mt-2 bg-[#FF4D4F] text-white rounded-[8px] px-3 py-1.5 flex items-center justify-between text-[11px] font-semibold shrink-0">
             <span>RACK FULL (9/9 OCCUPIED) — Retrieve a slot before storing new items.</span>
             <span class="mono text-[10px] bg-black/25 px-1.5 py-0.5 rounded">FULL</span>
           </div>
 
-          <!-- Split Workspace: Left 3D CAD Animation + Right 3x3 Rack Matrix -->
-          <div id="rackVisualWorkspace" class="cad-workspace-grid mode-split my-2">
-            <!-- LEFT PANE: LIVE 2.5D PHOTOREALISTIC CAD DIGITAL TWIN -->
-            <div id="cadTwinPane" class="cad-twin-pane">
-              <canvas id="asrsCadCanvas" aria-label="IND-02 ASRS 3D Digital Twin Animation"></canvas>
-              <div class="cad-mini-controls mono">
-                <button id="cadLabelsBtn" type="button" onclick="toggleCadBayLabels()" class="cad-mini-btn"
-                  title="Toggle A1–C3 bay labels on 3D rack">Labels</button>
-                <button id="cadSimBtn" type="button" onclick="previewCadDemoCycle()" class="cad-mini-btn"
-                  title="Preview animated cycle on selected slot (offline safe)">Sim</button>
+          <div class="my-2 bg-white/55 backdrop-blur-md rounded-[12px] p-3 border border-white/80 flex-1 flex flex-col justify-between lg:min-h-0">
+            <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#5C646C] mb-2 shrink-0">
+              <span id="matrixInstructionText" class="font-medium text-[#1E2022]">
+                Select any slot to inspect, store, or retrieve
+              </span>
+              <div class="flex items-center gap-3">
+                <span class="inline-flex items-center gap-1 font-medium text-black">
+                  <span class="w-2.5 h-2.5 rounded-[3px] bg-[#FFBC5B] border border-black"></span> Target
+                </span>
+                <span class="inline-flex items-center gap-1 font-medium text-black">
+                  <span class="w-2.5 h-2.5 rounded-[3px] bg-[#A6E9FF]"></span> Occupied
+                </span>
+                <span class="inline-flex items-center gap-1 font-medium text-[#5C646C]">
+                  <span class="w-2.5 h-2.5 rounded-[3px] bg-[#D8DCE0]"></span> Empty
+                </span>
               </div>
             </div>
 
-            <!-- RIGHT PANE: 3x3 RACK MATRIX GRID (Clean Slot ID, Status & Product Name/SKU) -->
-            <div id="rackMatrixPane" class="bg-white/55 backdrop-blur-md rounded-[12px] p-2.5 border border-white/80 flex-1 flex flex-col justify-between lg:min-h-0">
-              <!-- Compact Legend -->
-              <div class="flex flex-wrap items-center justify-between gap-1.5 text-[10.5px] text-[#5C646C] mb-1.5 shrink-0">
-                <span id="matrixInstructionText" class="font-medium text-[#1E2022] truncate">
-                  Click any slot or 3D bay to select
-                </span>
-                <div class="flex items-center gap-2.5 shrink-0">
-                  <span class="inline-flex items-center gap-1 font-medium text-black">
-                    <span class="w-2.5 h-2.5 rounded-[3px] bg-[#FFBC5B] border border-black"></span> Target
-                  </span>
-                  <span class="inline-flex items-center gap-1 font-medium text-black">
-                    <span class="w-2.5 h-2.5 rounded-[3px] bg-[#A6E9FF]"></span> Occupied
-                  </span>
-                  <span class="inline-flex items-center gap-1 font-medium text-[#5C646C]">
-                    <span class="w-2.5 h-2.5 rounded-[3px] bg-[#D8DCE0]"></span> Empty
-                  </span>
+            <div class="grid grid-cols-12 gap-2 flex-1 items-stretch lg:min-h-0">
+              <div class="col-span-2 flex flex-col justify-between gap-2 text-[11px] mono text-[#5C646C]">
+                <div class="flex-1 flex flex-col justify-center bg-white/70 rounded-[8px] px-2 border border-white">
+                  <span class="font-bold text-black">ROW C</span>
+                  <span class="text-[10px]">Top</span>
+                </div>
+                <div class="flex-1 flex flex-col justify-center bg-white/70 rounded-[8px] px-2 border border-white">
+                  <span class="font-bold text-black">ROW B</span>
+                  <span class="text-[10px]">Mid</span>
+                </div>
+                <div class="flex-1 flex flex-col justify-center bg-white/70 rounded-[8px] px-2 border border-white">
+                  <span class="font-bold text-black">ROW A</span>
+                  <span class="text-[10px]">Low</span>
                 </div>
               </div>
 
-              <!-- 3x3 Grid with Row Labels -->
-              <div class="grid grid-cols-12 gap-1.5 flex-1 items-stretch lg:min-h-0">
-                <div class="col-span-2 flex flex-col justify-between gap-1.5 text-[10px] mono text-[#5C646C]">
-                  <div class="flex-1 flex flex-col justify-center bg-white/70 rounded-[8px] px-1.5 border border-white">
-                    <span class="font-bold text-black">ROW C</span>
-                    <span class="text-[9.5px]">Top</span>
-                  </div>
-                  <div class="flex-1 flex flex-col justify-center bg-white/70 rounded-[8px] px-1.5 border border-white">
-                    <span class="font-bold text-black">ROW B</span>
-                    <span class="text-[9.5px]">Mid</span>
-                  </div>
-                  <div class="flex-1 flex flex-col justify-center bg-white/70 rounded-[8px] px-1.5 border border-white">
-                    <span class="font-bold text-black">ROW A</span>
-                    <span class="text-[9.5px]">Low</span>
-                  </div>
-                </div>
-
-                <div class="col-span-10 grid grid-cols-3 grid-rows-3 gap-1.5 flex-1 lg:min-h-0">
-                  <!-- Row C -->
-                  <button onclick="onUserClickSlot('C1')" id="boxBtn-C1" class="rack-slot-cell text-left"></button>
-                  <button onclick="onUserClickSlot('C2')" id="boxBtn-C2" class="rack-slot-cell text-left"></button>
-                  <button onclick="onUserClickSlot('C3')" id="boxBtn-C3" class="rack-slot-cell text-left"></button>
-                  <!-- Row B -->
-                  <button onclick="onUserClickSlot('B1')" id="boxBtn-B1" class="rack-slot-cell text-left"></button>
-                  <button onclick="onUserClickSlot('B2')" id="boxBtn-B2" class="rack-slot-cell text-left"></button>
-                  <button onclick="onUserClickSlot('B3')" id="boxBtn-B3" class="rack-slot-cell text-left"></button>
-                  <!-- Row A -->
-                  <button onclick="onUserClickSlot('A1')" id="boxBtn-A1" class="rack-slot-cell text-left"></button>
-                  <button onclick="onUserClickSlot('A2')" id="boxBtn-A2" class="rack-slot-cell text-left"></button>
-                  <button onclick="onUserClickSlot('A3')" id="boxBtn-A3" class="rack-slot-cell text-left"></button>
-                </div>
+              <div class="col-span-10 grid grid-cols-3 grid-rows-3 gap-2 flex-1 lg:min-h-0">
+                <button onclick="onUserClickSlot('C1')" id="boxBtn-C1" class="rack-slot-cell text-left"></button>
+                <button onclick="onUserClickSlot('C2')" id="boxBtn-C2" class="rack-slot-cell text-left"></button>
+                <button onclick="onUserClickSlot('C3')" id="boxBtn-C3" class="rack-slot-cell text-left"></button>
+                <button onclick="onUserClickSlot('B1')" id="boxBtn-B1" class="rack-slot-cell text-left"></button>
+                <button onclick="onUserClickSlot('B2')" id="boxBtn-B2" class="rack-slot-cell text-left"></button>
+                <button onclick="onUserClickSlot('B3')" id="boxBtn-B3" class="rack-slot-cell text-left"></button>
+                <button onclick="onUserClickSlot('A1')" id="boxBtn-A1" class="rack-slot-cell text-left"></button>
+                <button onclick="onUserClickSlot('A2')" id="boxBtn-A2" class="rack-slot-cell text-left"></button>
+                <button onclick="onUserClickSlot('A3')" id="boxBtn-A3" class="rack-slot-cell text-left"></button>
               </div>
             </div>
           </div>
 
-          <!-- Footer Bar -->
           <div class="flex items-center justify-between text-[11px] text-[#5C646C] shrink-0">
             <span>FIFO Sequence: <strong class="mono text-black">A1 &rarr; A2 &rarr; A3 &rarr; B1 &rarr; B2 &rarr; B3 &rarr; C1 &rarr; C2 &rarr; C3</strong></span>
-            <span>Origin: <strong class="mono text-black">Home (0,0)</strong></span>
+            <span>Retrieval Z Offset (A): <strong id="operatorRetZOffsetReadout" class="mono text-black">0.00 rev</strong></span>
           </div>
         </section>
 
-        <!-- PANEL 2: CYCLE CONTROL (Merged Selected Slot Manifest + Store/Retrieve/Stop + Steps 1-6) -->
+        <!-- PANEL 2: CYCLE CONTROL -->
         <section class="aurora-card p-3.5 space-y-2.5 shrink-0">
-          <!-- Selected Slot Info & Active Manifest Header -->
           <div class="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 pb-2.5">
             <div class="flex items-center gap-3">
               <div>
@@ -647,19 +513,17 @@
 
               <div class="h-7 w-[1px] bg-black/10 hidden sm:block"></div>
 
-              <!-- Merged Selected Slot Product Manifest -->
               <div id="mergedSlotManifest" class="text-[12px] text-[#1E2022]">
                 <span class="text-[#5C646C]">Empty slot — ready for storage</span>
               </div>
             </div>
 
             <div class="text-right">
-              <span class="text-[10px] font-semibold uppercase tracking-wider text-[#5C646C] block">Target Position</span>
-              <span id="selectedBoxCoordPreview" class="mono text-[13px] font-bold text-black">X 2.00 &bull; Z 1.50 rev</span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider text-[#5C646C] block">Target Position (Store / Retrieve)</span>
+              <span id="selectedBoxCoordPreview" class="mono text-[12px] font-bold text-black">X 2.00 &bull; Store Z 1.50 &bull; Ret Z 1.50 rev</span>
             </div>
           </div>
 
-          <!-- Compact Feedback Line -->
           <div id="operationFeedbackBanner" class="bg-white/80 border border-black/10 rounded-[8px] px-3 py-1.5 flex items-center justify-between gap-2 text-[11px]">
             <span id="operationFeedbackText" class="font-medium text-[#1E2022] truncate">
               Ready to dispatch cycle. Product registration is optional.
@@ -667,7 +531,6 @@
             <span id="pendingSyncBadge" class="cat-badge badge-mint !h-[18px] !text-[9px]">SYNCED</span>
           </div>
 
-          <!-- Primary Operator Actions: Store, Retrieve, Stop -->
           <div class="grid grid-cols-12 gap-2">
             <button id="btnDispatchStore" onclick="executeAsrsCycle('STORE')"
               class="col-span-5 btn-primary !h-[40px] !text-[13px] w-full justify-between px-3.5 shadow-sm">
@@ -694,7 +557,6 @@
             </button>
           </div>
 
-          <!-- Clean 1 to 6 Step Progress Strip -->
           <div class="pt-1.5 border-t border-black/10 space-y-1.5">
             <div class="flex items-center justify-between text-[11px]">
               <span class="font-semibold text-[#5C646C]">Sequence Progress</span>
@@ -726,12 +588,10 @@
 
       </div>
 
-      <!-- ================================================================= -->
-      <!-- RIGHT COLUMN (5 Cols): Slot & Product Details + Live Telemetry    -->
-      <!-- ================================================================= -->
+      <!-- RIGHT COLUMN (5 Cols): Slot & Product Details + Live Telemetry -->
       <aside class="lg:col-span-5 flex flex-col justify-between gap-2.5 lg:min-h-0">
 
-        <!-- PANEL 3: SLOT & PRODUCT DETAILS (Optional Registration) -->
+        <!-- PANEL 3: SLOT & PRODUCT DETAILS -->
         <section class="floating-glass-card p-4 flex-1 flex flex-col justify-between gap-2.5">
           <div class="flex items-center justify-between border-b border-[#ECEEF0] pb-2">
             <div>
@@ -781,7 +641,7 @@
           </div>
         </section>
 
-        <!-- PANEL 4: LIVE TELEMETRY (Clean Operator Readout — No GPIO Pins or Raw Steps) -->
+        <!-- PANEL 4: LIVE TELEMETRY -->
         <section class="floating-glass-card p-4 space-y-2.5 shrink-0">
           <div class="flex items-center justify-between border-b border-[#ECEEF0] pb-2">
             <h3 class="text-[15px] font-bold text-black leading-tight">Live Telemetry</h3>
@@ -823,13 +683,11 @@
     </main>
 
     <!-- ===================================================================== -->
-    <!-- VIEW 2: SETTINGS & SETUP MODE (FITS 100% INSIDE SINGLE VIEWPORT)      -->
-    <!-- Includes all relocated Hardware Pins, Core Info, and Step Counts      -->
+    <!-- VIEW 2: SETTINGS & SETUP MODE                                         -->
     <!-- ===================================================================== -->
     <section id="viewPanel-settings" role="tabpanel" aria-labelledby="viewTab-settings"
       class="hidden flex-1 lg:min-h-0 flex flex-col">
 
-      <!-- Internal Sub-Tabs + Relocated Commissioning Telemetry Summary -->
       <div class="flex flex-wrap items-center justify-between gap-2 px-1 shrink-0">
         <div class="flex flex-wrap items-center gap-1" role="tablist" aria-label="Settings Sub-Tabs">
           <button id="settingsTab-calibration" onclick="switchSettingsSubTab('calibration')"
@@ -849,7 +707,6 @@
           </button>
         </div>
 
-        <!-- Relocated Hardware Pinout & Step Count Readout Bar -->
         <div class="text-[11px] text-[#5C646C] hidden xl:flex items-center gap-3 pb-1 mono">
           <span>X (Pin 14/27): <strong id="m1Steps" class="text-black">0</strong> st</span>
           <span>&bull;</span>
@@ -861,7 +718,6 @@
         </div>
       </div>
 
-      <!-- Docked White Engineering Workspace Container -->
       <div class="bg-white rounded-[14px] p-4 shadow-[0_6px_20px_rgba(15,23,42,0.06)] flex-1 lg:min-h-0 overflow-y-auto">
 
         <!-- =============================================================== -->
@@ -870,25 +726,25 @@
         <div id="settingsPanel-calibration" role="tabpanel" aria-labelledby="settingsTab-calibration" class="h-full">
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 h-full">
 
-            <!-- Left Card: SETBOX PROTOCOL + Adjustable Z Offset + Individual Slot Test Move -->
-            <div class="bg-[#F8F9FA] rounded-[12px] p-4 border border-[#ECEEF0] flex flex-col justify-between gap-3">
-              <div class="space-y-3">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E5E9] pb-2.5">
+            <!-- Left Card: SETBOX PROTOCOL + Retrieval Z-Axis Offset (A) + Step 5B Z Offset + Slot Test -->
+            <div class="bg-[#F8F9FA] rounded-[12px] p-3.5 border border-[#ECEEF0] flex flex-col justify-between gap-2.5">
+              <div class="space-y-2.5">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E5E9] pb-2">
                   <div>
                     <span class="cat-badge badge-amber !h-[18px] !text-[9px]">SETBOX PROTOCOL</span>
-                    <h3 class="text-[15px] font-bold text-black mt-0.5">Slot Coordinate Calibration</h3>
+                    <h3 class="text-[15px] font-bold text-black mt-0.5">Slot Coordinate &amp; Z-Offset Calibration</h3>
                   </div>
-                  <button onclick="saveSingleBoxCoordinate()" class="btn-primary !min-h-[34px] !text-[12px]">
+                  <button onclick="saveSingleBoxCoordinate()" class="btn-primary !min-h-[32px] !text-[12px]">
                     Save Box to ESP32
                   </button>
                 </div>
 
                 <!-- Base Slot Address, X Rev, Z Rev -->
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <div>
-                    <label for="settingBoxSelect" class="block text-[11px] font-medium text-[#5C646C] mb-1">Slot Address</label>
+                    <label for="settingBoxSelect" class="block text-[11px] font-medium text-[#5C646C] mb-0.5">Slot Address</label>
                     <select id="settingBoxSelect" onchange="selectBox(this.value, true)"
-                      class="w-full h-[34px] bg-white border border-[#D8DCE0] rounded-[8px] px-2.5 text-[12px] font-semibold text-[#1E2022] mono">
+                      class="w-full h-[32px] bg-white border border-[#D8DCE0] rounded-[8px] px-2 text-[12px] font-semibold text-[#1E2022] mono">
                       <option value="A1">A1 (Row A, Bay 1)</option>
                       <option value="A2">A2 (Row A, Bay 2)</option>
                       <option value="A3">A3 (Row A, Bay 3)</option>
@@ -902,73 +758,104 @@
                   </div>
 
                   <div>
-                    <label for="boxXRevInput" class="block text-[11px] font-medium text-[#5C646C] mb-1">
+                    <label for="boxXRevInput" class="block text-[11px] font-medium text-[#5C646C] mb-0.5">
                       X Rev (<span id="coordBoxTitle" class="mono font-bold text-black">A1</span>)
                     </label>
                     <input id="boxXRevInput" type="number" step="0.1" value="2.0"
                       oninput="markSlotConfigDirty()"
-                      class="w-full h-[34px] bg-white border border-[#D8DCE0] rounded-[8px] px-2.5 text-[12px] font-semibold text-[#1E2022] mono" />
+                      class="w-full h-[32px] bg-white border border-[#D8DCE0] rounded-[8px] px-2.5 text-[12px] font-semibold text-[#1E2022] mono" />
                   </div>
 
                   <div>
-                    <label for="boxZRevInput" class="block text-[11px] font-medium text-[#5C646C] mb-1">Z Rev</label>
+                    <label for="boxZRevInput" class="block text-[11px] font-medium text-[#5C646C] mb-0.5">Base Z Rev (Storage)</label>
                     <input id="boxZRevInput" type="number" step="0.1" value="1.5"
                       oninput="markSlotConfigDirty()"
-                      class="w-full h-[34px] bg-white border border-[#D8DCE0] rounded-[8px] px-2.5 text-[12px] font-semibold text-[#1E2022] mono" />
+                      class="w-full h-[32px] bg-white border border-[#D8DCE0] rounded-[8px] px-2.5 text-[12px] font-semibold text-[#1E2022] mono" />
                   </div>
                 </div>
 
-                <!-- Adjustable Z Offset -->
-                <div class="bg-white rounded-[10px] p-3 border border-[#E2E5E9] space-y-2">
-                  <div class="flex flex-wrap items-center justify-between gap-2">
+                <!-- NEW: RETRIEVAL Z-AXIS OFFSET (A) — Isolated Exclusively to Retrieval Mode -->
+                <div class="bg-white rounded-[10px] p-2.5 border-2 border-[#6968FF]/30 space-y-2">
+                  <div class="flex flex-wrap items-center justify-between gap-1.5">
                     <div>
-                      <span class="text-[12px] font-semibold text-black block">Z-Axis Lift/Drop Offset</span>
-                      <span class="text-[11px] text-[#5C646C]">Step 4 lift/drop offset (+ or &minus; rev)</span>
+                      <div class="flex items-center gap-1.5">
+                        <span class="cat-badge badge-indigo !h-[17px] !text-[9px] !min-w-0">RETRIEVAL ONLY</span>
+                        <span class="text-[12px] font-bold text-black">Retrieval Z-Axis Offset (A)</span>
+                      </div>
+                      <span class="text-[10px] text-[#5C646C] block">Fine-tunes Step 2 Z approach height so fork aligns underneath pallet (Storage unchanged)</span>
                     </div>
-                    <span class="cat-badge badge-mint mono">
-                      Active: <strong id="currentZOffsetBadge" class="ml-1">+0.40 rev</strong>
+                    <span class="cat-badge badge-yellow mono !h-[20px]">
+                      A: <strong id="currentRetZOffsetBadge" class="ml-1">0.00 rev</strong>
                     </span>
                   </div>
 
-                  <div class="flex items-center gap-2">
+                  <!-- Fine-Tuning Step Controls + Numeric Input + Save -->
+                  <div class="flex flex-wrap items-center gap-1.5">
+                    <div class="flex items-center gap-1">
+                      <button type="button" onclick="nudgeRetrievalZOffset(-0.10)" class="h-[30px] px-2 rounded-[6px] bg-[#F4F6F8] hover:bg-black hover:text-white border border-[#D8DCE0] mono text-[11px] font-semibold cursor-pointer" title="Decrease by 0.10 rev">-0.10</button>
+                      <button type="button" onclick="nudgeRetrievalZOffset(-0.05)" class="h-[30px] px-2 rounded-[6px] bg-[#F4F6F8] hover:bg-black hover:text-white border border-[#D8DCE0] mono text-[11px] font-semibold cursor-pointer" title="Decrease by 0.05 rev">-0.05</button>
+                      <button type="button" onclick="nudgeRetrievalZOffset(-0.01)" class="h-[30px] px-2 rounded-[6px] bg-[#F4F6F8] hover:bg-black hover:text-white border border-[#D8DCE0] mono text-[11px] font-semibold cursor-pointer" title="Decrease by 0.01 rev">-0.01</button>
+                    </div>
+
+                    <input id="retZOffsetInput" type="number" step="0.01" min="-5.00" max="5.00" value="0.00"
+                      oninput="updateRetZOffsetPreview()"
+                      class="w-20 h-[30px] bg-[#F8F9FA] border border-[#D8DCE0] rounded-[6px] px-2 text-center text-[12px] font-bold text-[#1E2022] mono" />
+
+                    <div class="flex items-center gap-1">
+                      <button type="button" onclick="nudgeRetrievalZOffset(0.01)" class="h-[30px] px-2 rounded-[6px] bg-[#F4F6F8] hover:bg-black hover:text-white border border-[#D8DCE0] mono text-[11px] font-semibold cursor-pointer" title="Increase by 0.01 rev">+0.01</button>
+                      <button type="button" onclick="nudgeRetrievalZOffset(0.05)" class="h-[30px] px-2 rounded-[6px] bg-[#F4F6F8] hover:bg-black hover:text-white border border-[#D8DCE0] mono text-[11px] font-semibold cursor-pointer" title="Increase by 0.05 rev">+0.05</button>
+                      <button type="button" onclick="nudgeRetrievalZOffset(0.10)" class="h-[30px] px-2 rounded-[6px] bg-[#F4F6F8] hover:bg-black hover:text-white border border-[#D8DCE0] mono text-[11px] font-semibold cursor-pointer" title="Increase by 0.10 rev">+0.10</button>
+                    </div>
+
+                    <button type="button" onclick="saveRetrievalZOffsetConfiguration()" class="btn-primary !min-h-[30px] !px-3 !text-[11px] ml-auto">
+                      Save Offset (A)
+                    </button>
+                  </div>
+
+                  <div id="retZEffectivePreview" class="text-[10px] mono text-[#5C646C] flex items-center justify-between pt-0.5 border-t border-[#ECEEF0]">
+                    <span>Slot A1 Storage Z: <strong class="text-black">1.50 rev</strong> (Unchanged)</span>
+                    <span>Slot A1 Retrieval Z: <strong class="text-[#6968FF]">1.50 rev</strong> (Base + A)</span>
+                  </div>
+                </div>
+
+                <!-- Step 5B Lift/Drop Z Offset -->
+                <div class="bg-white rounded-[10px] p-2.5 border border-[#E2E5E9] flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <span class="text-[11px] font-semibold text-black block">Step 4 Fork Lift/Drop Stroke Offset</span>
+                    <span class="text-[10px] text-[#5C646C]">Vertical lift/drop stroke after fork extends (Active: <strong id="currentZOffsetBadge" class="mono text-black">+0.40 rev</strong>)</span>
+                  </div>
+                  <div class="flex items-center gap-1.5">
                     <input id="zOffsetInput" type="number" step="0.05" min="-5.0" max="5.0" value="0.40"
-                      placeholder="e.g. 0.40 or -0.25"
-                      class="flex-1 h-[34px] bg-[#F8F9FA] border border-[#D8DCE0] rounded-[8px] px-2.5 text-[12px] font-semibold text-[#1E2022] mono" />
-                    <button onclick="saveZOffsetConfiguration()" class="btn-primary !min-h-[34px] !text-[12px]">
-                      Save Z Offset
+                      class="w-20 h-[30px] bg-[#F8F9FA] border border-[#D8DCE0] rounded-[6px] px-2 text-[12px] font-semibold text-[#1E2022] mono" />
+                    <button onclick="saveZOffsetConfiguration()" class="btn-secondary !min-h-[30px] !px-2.5 !text-[11px]">
+                      Save Stroke
                     </button>
                   </div>
                 </div>
 
                 <!-- Individual Slot Movement Testing -->
-                <div class="bg-white rounded-[10px] p-3 border border-[#E2E5E9] space-y-2">
+                <div class="bg-white rounded-[10px] p-2.5 border border-[#E2E5E9] space-y-1.5">
                   <div class="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <span class="text-[12px] font-semibold text-black block">Slot Movement Test</span>
-                      <span class="text-[11px] text-[#5C646C]">Moves gantry to <strong id="testMoveSlotLabel" class="mono text-black">A1</strong> without fork actuation</span>
-                    </div>
-                    <div class="flex items-center gap-1.5">
-                      <span class="text-[11px] text-[#5C646C]">State:</span>
-                      <span id="slotTestStatusBadge" class="cat-badge badge-muted">Idle</span>
-                    </div>
+                    <span class="text-[11px] font-semibold text-black">Slot Movement Test (<strong id="testMoveSlotLabel" class="mono">A1</strong>)</span>
+                    <span id="slotTestStatusBadge" class="cat-badge badge-muted !h-[18px] !text-[9px]">Idle</span>
                   </div>
 
                   <div class="grid grid-cols-2 gap-2">
-                    <button id="btnTestSlotMove" onclick="executeSlotTestMove()" class="btn-primary !min-h-[34px] !text-[12px]">
+                    <button id="btnTestSlotMove" onclick="executeSlotTestMove()" class="btn-primary !min-h-[30px] !text-[11px]">
                       <span>&#9654; Test Move</span>
                     </button>
-                    <button id="btnTestReturnHome" onclick="executeTestReturnHome()" class="btn-secondary !min-h-[34px] !text-[12px]">
+                    <button id="btnTestReturnHome" onclick="executeTestReturnHome()" class="btn-secondary !min-h-[30px] !text-[11px]">
                       <span>&#127968; Return Home</span>
                     </button>
                   </div>
-                  <div id="slotTestValidationMsg" class="text-[11px] text-[#5C646C] mono truncate">
+                  <div id="slotTestValidationMsg" class="text-[10px] text-[#5C646C] mono truncate">
                     Ready: Coordinates saved &amp; verified.
                   </div>
                 </div>
               </div>
 
-              <div class="bg-white rounded-[8px] px-3 py-2 border border-[#E2E5E9] text-[11px] text-[#5C646C] flex items-center justify-between">
-                <span>Protocol: <code class="mono text-black font-semibold">SETBOX</code> / <code class="mono text-black font-semibold">ZOFFSET</code> / <code class="mono text-black font-semibold">TESTSLOT</code></span>
+              <div class="bg-white rounded-[8px] px-3 py-1.5 border border-[#E2E5E9] text-[10px] text-[#5C646C] flex items-center justify-between">
+                <span>Commands: <code class="mono text-black font-semibold">SETBOX</code> &bull; <code class="mono text-black font-semibold">RETZOFFSET</code> &bull; <code class="mono text-black font-semibold">ZOFFSET</code></span>
                 <span id="calibSavedIndicator" class="cat-badge badge-mint !h-[18px] !text-[9px]">SAVED</span>
               </div>
             </div>
@@ -1012,7 +899,6 @@
                   </div>
                 </div>
 
-                <!-- Timed Test & Continuous Override Bar -->
                 <div class="bg-white rounded-[10px] p-3 border border-[#E2E5E9] space-y-2">
                   <span class="text-[11px] font-semibold text-black block">Servo Actuation Testing</span>
                   <div class="flex flex-wrap items-center justify-between gap-2">
@@ -1033,7 +919,6 @@
                   </div>
                 </div>
 
-                <!-- Relocated Hardware Pinout & Architecture Reference -->
                 <div class="bg-white rounded-[10px] p-3 border border-[#E2E5E9] space-y-1.5">
                   <span class="text-[11px] font-semibold text-black block">ESP32 Hardware Pinout &amp; Step Diagnostics</span>
                   <div class="grid grid-cols-2 gap-2 text-[11px] text-[#5C646C] mono">
@@ -1059,7 +944,6 @@
         <!-- =============================================================== -->
         <div id="settingsPanel-kinematics" role="tabpanel" aria-labelledby="settingsTab-kinematics" class="hidden space-y-3.5">
 
-          <!-- Consolidated Homing & Safety Actions Bar -->
           <div class="bg-[#F8F9FA] rounded-[12px] p-3.5 border border-[#ECEEF0] flex flex-wrap items-center justify-between gap-2.5">
             <div>
               <span class="cat-badge badge-mint !h-[18px] !text-[9px]">ORIGIN &amp; SAFETY</span>
@@ -1083,7 +967,6 @@
           </div>
 
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <!-- Left 7 Cols: Manual Axis Jogging -->
             <div class="lg:col-span-7 bg-[#F8F9FA] rounded-[12px] p-4 border border-[#ECEEF0] space-y-3.5">
               <div class="flex items-center justify-between border-b border-[#E2E5E9] pb-2.5">
                 <div>
@@ -1131,7 +1014,6 @@
               </div>
             </div>
 
-            <!-- Right 5 Cols: Speed (RPM) & Acceleration Ramp -->
             <div class="lg:col-span-5 bg-[#F8F9FA] rounded-[12px] p-4 border border-[#ECEEF0] space-y-3">
               <div class="flex items-center justify-between border-b border-[#E2E5E9] pb-2.5">
                 <h3 class="text-[15px] font-bold text-black">Speed &amp; Acceleration Ramp</h3>
@@ -1148,7 +1030,6 @@
                 </div>
               </div>
 
-              <!-- Speed RPM Control -->
               <div class="bg-white rounded-[10px] p-3 border border-[#E2E5E9] space-y-2">
                 <div class="flex justify-between items-center text-[11px]">
                   <label for="speedInput" class="font-medium text-[#5C646C]">Peak Speed (Active: <strong id="liveRpmBadge" class="text-black mono">60</strong> RPM)</label>
@@ -1175,7 +1056,6 @@
                 </div>
               </div>
 
-              <!-- Ramp Acceleration Control -->
               <div class="bg-white rounded-[10px] p-3 border border-[#E2E5E9] space-y-2">
                 <div class="flex justify-between items-center text-[11px]">
                   <label for="accelInput" class="font-medium text-[#5C646C]">Ramp (Active: <strong id="liveAccelBadge" class="text-black mono">800</strong> st/s²)</label>
@@ -1212,7 +1092,6 @@
         <div id="settingsPanel-diagnostics" role="tabpanel" aria-labelledby="settingsTab-diagnostics" class="hidden h-full">
           <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 h-full">
 
-            <!-- Left 7 Cols: Filterable Inventory & Product State Table -->
             <div class="lg:col-span-7 bg-[#F8F9FA] rounded-[12px] p-3.5 border border-[#ECEEF0] flex flex-col gap-2.5">
               <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#E2E5E9]">
                 <h3 class="text-[15px] font-bold text-black">Inventory State Override (`/asrs/inventory`)</h3>
@@ -1255,14 +1134,11 @@
                       <th class="py-2 px-2.5 text-right">Override</th>
                     </tr>
                   </thead>
-                  <tbody id="inventoryTableBody" class="text-[12px] text-[#1E2022]">
-                    <!-- Populated dynamically by renderRackMatrix() -->
-                  </tbody>
+                  <tbody id="inventoryTableBody" class="text-[12px] text-[#1E2022]"></tbody>
                 </table>
               </div>
             </div>
 
-            <!-- Right 5 Cols: Raw Command Bus Terminal & Timestamped Audit Log -->
             <div class="lg:col-span-5 bg-[#F8F9FA] rounded-[12px] p-3.5 border border-[#ECEEF0] flex flex-col justify-between gap-2.5">
               <div class="space-y-2.5">
                 <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-[#E2E5E9]">
@@ -1279,7 +1155,7 @@
 
                 <div class="flex gap-1.5">
                   <input id="rawCommandInput" type="text"
-                    placeholder="Command (e.g. ZOFFSET:0.4, TESTSLOT:A1:2.0:1.5)..."
+                    placeholder="Command (e.g. RETZOFFSET:-0.25, ZOFFSET:0.4)..."
                     onkeydown="if(event.key==='Enter') sendRawCommand()"
                     class="flex-1 h-[34px] bg-white border border-[#D8DCE0] rounded-[8px] px-2.5 text-[12px] text-[#1E2022] mono placeholder:text-[#7A828A]" />
                   <button onclick="sendRawCommand()" class="btn-primary !min-h-[34px] !text-[12px]">
@@ -1302,67 +1178,44 @@
   </div>
 
   <!-- ======================================================================= -->
-  <!-- 2.5D PHOTOREALISTIC CAD DIGITAL TWIN ENGINE                             -->
-  <!-- ======================================================================= -->
-  <script src="./asrs_cad_widget/asrs-cad-twin.js?v=2.1"></script>
-
-  <!-- ======================================================================= -->
-  <!-- APPLICATION LOGIC, FIFO AUTO-ALLOCATION & FIREBASE CONFIG PERSISTENCE   -->
+  <!-- APPLICATION LOGIC, RETRIEVAL Z-OFFSET (A) & FIREBASE PERSISTENCE        -->
   <!-- ======================================================================= -->
   <script>
-    // Firebase Configuration matching ESP32 Firmware Credentials
     const FIREBASE_HOST = "https://pp-ind02-default-rtdb.asia-southeast1.firebasedatabase.app";
     const FIREBASE_AUTH = "nryzRKE5yCmDJqwdPtMOHDKV8EKbdTAraTgQQvC3";
 
-    // 3D CAD Digital Twin Asset Path & Instance
-    const CAD_ASSET_PATH = "./asrs_cad_widget/assets/";
-    let asrsTwin = null;
-    let cadVisualMode = "split"; // "split" | "3d" | "matrix"
-    let cadBayLabelsOn = false;
-    let cadSimActive = false;
-
-    // Strict FIFO Priority Sequence for AUTO MODE
     const FIFO_SLOT_PRIORITY = ["A1", "A2", "A3", "B1", "B2", "B3", "C1", "C2", "C3"];
 
-    // Default Revolution Coordinates from [0,0] for Rack Matrix Slots (A1 - C3)
     const BOX_COORDINATES = {
       A1: { x: 2.0, z: 1.5 }, A2: { x: 5.0, z: 1.5 }, A3: { x: 8.0, z: 1.5 },
       B1: { x: 2.0, z: 4.0 }, B2: { x: 5.0, z: 4.0 }, B3: { x: 8.0, z: 4.0 },
       C1: { x: 2.0, z: 6.5 }, C2: { x: 5.0, z: 6.5 }, C3: { x: 8.0, z: 6.5 }
     };
 
-    // Physical Rack Occupancy Map (Confirmed by ESP32 or synced from /asrs/inventory)
     const BOX_OCCUPANCY = {
       A1: false, A2: false, A3: false,
       B1: false, B2: false, B3: false,
       C1: false, C2: false, C3: false
     };
 
-    // Product Information Map per Slot (Synced with /asrs/products and localStorage)
     const BOX_PRODUCTS = {
       A1: null, A2: null, A3: null,
       B1: null, B2: null, B3: null,
       C1: null, C2: null, C3: null
     };
 
-    // Operational State
     let selectedBox = "A1";
-    let allocationMode = "MANUAL"; // "MANUAL" | "AUTO"
-    let zLiftOffsetRev = 0.40;     // Configurable Z Offset
-    let isSlotConfigDirty = false; // Prevents Test Move if unsaved coordinates exist
+    let allocationMode = "MANUAL";
+    let zLiftOffsetRev = 0.40;       // Step 5B post-extend vertical lift/drop stroke
+    let retrievalZOffsetRev = 0.00;  // Parameter A: Retrieval Z-Axis Offset (exclusive to Retrieval Mode)
+    let isSlotConfigDirty = false;
 
-    // Hardware Telemetry & Pending Operation Confirmation Tracker
     let esp32Online = false;
     let esp32Running = false;
     let esp32Locked = false;
-    let currentTestMoveState = "Idle"; // "Idle" | "Moving to Target" | "Target Reached" | "Returning Home" | "Home Reached" | "Error"
-
-    // Pending ASRS Operation awaiting ESP32 Hardware Completion Confirmation
+    let currentTestMoveState = "Idle";
     let pendingOperation = null;
 
-    // =========================================================================
-    // INITIALIZATION & PERSISTENT CONFIGURATION LOADING
-    // =========================================================================
     function loadLocalPersistence() {
       try {
         const savedCoords = localStorage.getItem("ind02_asrs_coords");
@@ -1377,6 +1230,10 @@
         const savedZOffset = localStorage.getItem("ind02_asrs_z_offset");
         if (savedZOffset !== null && !isNaN(parseFloat(savedZOffset))) {
           zLiftOffsetRev = parseFloat(savedZOffset);
+        }
+        const savedRetZOffset = localStorage.getItem("ind02_asrs_ret_z_offset");
+        if (savedRetZOffset !== null && !isNaN(parseFloat(savedRetZOffset))) {
+          retrievalZOffsetRev = parseFloat(savedRetZOffset);
         }
         const savedProducts = localStorage.getItem("ind02_asrs_products");
         if (savedProducts) {
@@ -1393,14 +1250,11 @@
       try {
         localStorage.setItem("ind02_asrs_coords", JSON.stringify(BOX_COORDINATES));
         localStorage.setItem("ind02_asrs_z_offset", String(zLiftOffsetRev));
+        localStorage.setItem("ind02_asrs_ret_z_offset", String(retrievalZOffsetRev));
         localStorage.setItem("ind02_asrs_products", JSON.stringify(BOX_PRODUCTS));
       } catch (e) {}
     }
 
-    // =========================================================================
-    // AUTOMATIC STORAGE ASSIGNMENT (FIFO AUTO MODE)
-    // Priority: A1 -> A2 -> A3 -> B1 -> B2 -> B3 -> C1 -> C2 -> C3
-    // =========================================================================
     function getNextAvailableFifoSlot() {
       for (let i = 0; i < FIFO_SLOT_PRIORITY.length; i++) {
         const slot = FIFO_SLOT_PRIORITY[i];
@@ -1477,12 +1331,10 @@
 
       isSlotConfigDirty = false;
       updateSlotConfigDirtyUI();
+      updateRetZOffsetPreview();
       renderRackMatrix();
     }
 
-    // =========================================================================
-    // RACK VISUALIZATION & PRODUCT INFORMATION RENDERING
-    // =========================================================================
     function escapeHtml(str) {
       return String(str || "")
         .replace(/&/g, "&amp;")
@@ -1497,7 +1349,6 @@
 
       const nextFifoSlot = getNextAvailableFifoSlot();
 
-      // 1. Render Simplified Operator Rack Cells (Slot ID, Status, Product Name/SKU only)
       allBoxes.forEach(boxId => {
         const isOccupied = !!BOX_OCCUPANCY[boxId];
         if (isOccupied) occupiedTotal++;
@@ -1551,7 +1402,6 @@
         `;
       });
 
-      // Update Occupied Count Pill & Full-Rack Alert Banner
       const occBadge = document.getElementById("occupiedCountBadge");
       if (occBadge) occBadge.textContent = `${occupiedTotal} / 9`;
 
@@ -1564,7 +1414,6 @@
         }
       }
 
-      // 2. Update Merged Selected Slot & Cycle Control Panel
       const selCoords = BOX_COORDINATES[selectedBox];
       const selOccupied = !!BOX_OCCUPANCY[selectedBox];
       const selProd = BOX_PRODUCTS[selectedBox];
@@ -1578,7 +1427,9 @@
       const coordPreviewEl = document.getElementById("selectedBoxCoordPreview");
       const stepsPreviewEl = document.getElementById("selectedBoxStepsPreview");
       if (coordPreviewEl && selCoords) {
-        coordPreviewEl.textContent = `X ${Number(selCoords.x).toFixed(2)} · Z ${Number(selCoords.z).toFixed(2)} rev`;
+        const storeZ = Number(selCoords.z);
+        const retrieveZ = Math.max(0, storeZ + retrievalZOffsetRev);
+        coordPreviewEl.textContent = `X ${Number(selCoords.x).toFixed(2)} · Store Z ${storeZ.toFixed(2)} · Ret Z ${retrieveZ.toFixed(2)} rev`;
       }
       if (stepsPreviewEl && selCoords) {
         stepsPreviewEl.textContent = `${Math.round(selCoords.x * 200)} X / ${Math.round(selCoords.z * 200)} Z st`;
@@ -1590,7 +1441,6 @@
         statusBadgeEl.className = selOccupied ? "cat-badge badge-lime" : "cat-badge badge-muted";
       }
 
-      // Merged Manifest Summary inside Cycle Control
       const mergedManifest = document.getElementById("mergedSlotManifest");
       if (mergedManifest) {
         if (selOccupied && selProd) {
@@ -1608,7 +1458,6 @@
         }
       }
 
-      // Update Target Slot Input Readout in Slot & Product Details
       const targetDisplay = document.getElementById("productTargetSlotDisplay");
       if (targetDisplay) {
         if (allocationMode === "AUTO") {
@@ -1620,7 +1469,6 @@
         }
       }
 
-      // Enable/Disable Store & Retrieve buttons
       const btnStore = document.getElementById("btnDispatchStore");
       const btnRetrieve = document.getElementById("btnDispatchRetrieve");
       const isBusy = !!pendingOperation || esp32Running;
@@ -1634,7 +1482,6 @@
         btnRetrieve.disabled = !canRetrieve;
       }
 
-      // 3. Render Settings & Setup Inventory Override Table
       const tbody = document.getElementById("inventoryTableBody");
       if (tbody) {
         const rowFilter = (document.getElementById("filterRowSelect") || {}).value || "ALL";
@@ -1680,8 +1527,6 @@
           `;
         }).join("");
       }
-
-      syncCadTwinState();
     }
 
     function setOperationFeedback(msg, type = "info") {
@@ -1714,7 +1559,8 @@
     }
 
     // =========================================================================
-    // AUTOMATED STORAGE & RETRIEVAL WORKFLOWS (OPTIONAL PRODUCT REGISTRATION)
+    // AUTOMATED STORAGE & RETRIEVAL WORKFLOWS
+    // Storage Mode uses exact Base Z. Retrieval Mode applies Retrieval Z-Axis Offset (A) on ESP32.
     // =========================================================================
     async function executeAsrsCycle(opPrefix) {
       if (esp32Locked) {
@@ -1748,7 +1594,6 @@
           }
         }
 
-        // Optional Product Registration: Default to Unlabeled Unit if left blank
         const rawName = document.getElementById("productNameInput").value.trim();
         const rawSku = document.getElementById("productSkuInput").value.trim();
         const rawCat = document.getElementById("productCategoryInput").value || "General";
@@ -1786,7 +1631,7 @@
           syncBadge.className = "cat-badge badge-yellow !h-[18px] !text-[9px]";
         }
         setOperationFeedback(
-          `Storing "${prodName}" (${prodSku}) into ${targetSlot}...`,
+          `Storing "${prodName}" (${prodSku}) into ${targetSlot} (Z=${zRev}r)...`,
           "pending"
         );
         renderRackMatrix();
@@ -1799,8 +1644,10 @@
 
         const coords = BOX_COORDINATES[targetSlot] || { x: 2.0, z: 1.5 };
         const xRev = Number(coords.x).toFixed(2);
-        const zRev = Number(coords.z).toFixed(2);
-        const fullCmd = `RETRIEVE:${targetSlot}:${xRev}:${zRev}`;
+        const baseZRev = Number(coords.z).toFixed(2);
+        const effRetZ = Math.max(0, Number(coords.z) + retrievalZOffsetRev).toFixed(2);
+        // Send base coordinates; ESP32 firmware adds retrievalZOffsetRev exclusively during RETRIEVAL
+        const fullCmd = `RETRIEVE:${targetSlot}:${xRev}:${baseZRev}`;
 
         const dispatched = await sendFirebaseCommand(fullCmd);
         if (!dispatched) {
@@ -1821,15 +1668,15 @@
           syncBadge.textContent = "RUNNING";
           syncBadge.className = "cat-badge badge-yellow !h-[18px] !text-[9px]";
         }
+        const signA = retrievalZOffsetRev >= 0 ? `+${retrievalZOffsetRev.toFixed(2)}` : retrievalZOffsetRev.toFixed(2);
         setOperationFeedback(
-          `Retrieving unit from ${targetSlot}...`,
+          `Retrieving from ${targetSlot} (Target Z=${effRetZ}r with Offset A=${signA}r)...`,
           "pending"
         );
         renderRackMatrix();
       }
     }
 
-    // Commit Pending Storage/Retrieval ONLY after ESP32 confirms completion
     function commitPendingOperationOnHardwareConfirm() {
       if (!pendingOperation) return;
       const { type, boxId, product } = pendingOperation;
@@ -1881,24 +1728,77 @@
     }
 
     // =========================================================================
-    // ADJUSTABLE Z OFFSET (PERSISTENT & ESP32 SYNCED)
+    // RETRIEVAL Z-AXIS OFFSET (A) & STEP 5B Z OFFSET CALIBRATION
     // =========================================================================
     function updateZOffsetReadouts() {
-      const signStr = zLiftOffsetRev >= 0 ? `+${zLiftOffsetRev.toFixed(2)} rev` : `${zLiftOffsetRev.toFixed(2)} rev`;
+      const signLift = zLiftOffsetRev >= 0 ? `+${zLiftOffsetRev.toFixed(2)} rev` : `${zLiftOffsetRev.toFixed(2)} rev`;
       const b1 = document.getElementById("currentZOffsetBadge");
-      const input = document.getElementById("zOffsetInput");
-
-      if (b1) b1.textContent = signStr;
-      if (input && document.activeElement !== input) {
-        input.value = zLiftOffsetRev.toFixed(2);
+      const inputLift = document.getElementById("zOffsetInput");
+      if (b1) b1.textContent = signLift;
+      if (inputLift && document.activeElement !== inputLift) {
+        inputLift.value = zLiftOffsetRev.toFixed(2);
       }
+
+      const signRetA = retrievalZOffsetRev >= 0 ? `+${retrievalZOffsetRev.toFixed(2)} rev` : `${retrievalZOffsetRev.toFixed(2)} rev`;
+      const bRet = document.getElementById("currentRetZOffsetBadge");
+      const opRet = document.getElementById("operatorRetZOffsetReadout");
+      const inputRet = document.getElementById("retZOffsetInput");
+      if (bRet) bRet.textContent = signRetA;
+      if (opRet) opRet.textContent = signRetA;
+      if (inputRet && document.activeElement !== inputRet) {
+        inputRet.value = retrievalZOffsetRev.toFixed(2);
+      }
+
+      updateRetZOffsetPreview();
       renderRackMatrix();
+    }
+
+    function updateRetZOffsetPreview() {
+      const inputRet = document.getElementById("retZOffsetInput");
+      const draftA = inputRet && !isNaN(parseFloat(inputRet.value)) ? parseFloat(inputRet.value) : retrievalZOffsetRev;
+      const coords = BOX_COORDINATES[selectedBox] || { x: 2.0, z: 1.5 };
+      const baseZ = Number(coords.z);
+      const effRetZ = Math.max(0, baseZ + draftA);
+      const previewEl = document.getElementById("retZEffectivePreview");
+      if (previewEl) {
+        previewEl.innerHTML = `
+          <span>Slot ${selectedBox} Storage Z: <strong class="text-black">${baseZ.toFixed(2)} rev</strong> (Unchanged)</span>
+          <span>Slot ${selectedBox} Retrieval Z: <strong class="text-[#6968FF]">${effRetZ.toFixed(2)} rev</strong> (Base ${baseZ.toFixed(2)} ${draftA >= 0 ? '+' : ''}${draftA.toFixed(2)})</span>
+        `;
+      }
+    }
+
+    function nudgeRetrievalZOffset(delta) {
+      const inputRet = document.getElementById("retZOffsetInput");
+      const currentVal = inputRet && !isNaN(parseFloat(inputRet.value)) ? parseFloat(inputRet.value) : retrievalZOffsetRev;
+      const nextVal = Math.max(-5.0, Math.min(5.0, Math.round((currentVal + delta) * 100) / 100));
+      if (inputRet) inputRet.value = nextVal.toFixed(2);
+      updateRetZOffsetPreview();
+    }
+
+    async function saveRetrievalZOffsetConfiguration() {
+      const val = parseFloat(document.getElementById("retZOffsetInput").value);
+      if (isNaN(val) || val < -5.0 || val > 5.0) {
+        appendLog("Enter a valid Retrieval Z-Axis Offset (A) between -5.00 and +5.00 rev!", "error");
+        return;
+      }
+
+      retrievalZOffsetRev = Math.round(val * 100) / 100;
+      saveLocalPersistence();
+      updateZOffsetReadouts();
+
+      await patchConfigToFirebase({ ret_z_offset: retrievalZOffsetRev });
+      await sendFirebaseCommand(`RETZOFFSET:${retrievalZOffsetRev.toFixed(2)}`);
+      appendLog(
+        `Retrieval Z-Axis Offset (A) saved & synced -> ${retrievalZOffsetRev >= 0 ? '+' : ''}${retrievalZOffsetRev.toFixed(2)} rev (Storage Mode unchanged)`,
+        "success"
+      );
     }
 
     async function saveZOffsetConfiguration() {
       const val = parseFloat(document.getElementById("zOffsetInput").value);
       if (isNaN(val) || val === 0 || val < -5.0 || val > 5.0) {
-        appendLog("Enter a valid non-zero Z Offset between -5.0 and +5.0 rev!", "error");
+        appendLog("Enter a valid non-zero Step 5B Z Stroke Offset between -5.0 and +5.0 rev!", "error");
         return;
       }
 
@@ -1908,7 +1808,7 @@
 
       await patchConfigToFirebase({ z_offset: zLiftOffsetRev });
       await sendFirebaseCommand(`ZOFFSET:${zLiftOffsetRev.toFixed(2)}`);
-      appendLog(`Z Offset saved & synced -> ${zLiftOffsetRev >= 0 ? '+' : ''}${zLiftOffsetRev.toFixed(2)} rev`, "success");
+      appendLog(`Step 5B Z Stroke Offset saved & synced -> ${zLiftOffsetRev >= 0 ? '+' : ''}${zLiftOffsetRev.toFixed(2)} rev`, "success");
     }
 
     // =========================================================================
@@ -1929,7 +1829,7 @@
         }
         if (msg) {
           msg.textContent = "Unsaved X/Z edits. Click 'Save Box to ESP32' before testing.";
-          msg.className = "text-[11px] text-[#D97706] font-semibold mono truncate";
+          msg.className = "text-[10px] text-[#D97706] font-semibold mono truncate";
         }
       } else {
         if (badge) {
@@ -1938,7 +1838,7 @@
         }
         if (msg) {
           msg.textContent = `Slot ${selectedBox} coordinates saved & verified.`;
-          msg.className = "text-[11px] text-[#5C646C] mono truncate";
+          msg.className = "text-[10px] text-[#5C646C] mono truncate";
         }
       }
     }
@@ -1950,13 +1850,13 @@
       badge.textContent = stateText;
 
       if (stateText === "Idle") {
-        badge.className = "cat-badge badge-muted";
+        badge.className = "cat-badge badge-muted !h-[18px] !text-[9px]";
       } else if (stateText === "Moving to Target" || stateText === "Returning Home") {
-        badge.className = "cat-badge badge-yellow";
+        badge.className = "cat-badge badge-yellow !h-[18px] !text-[9px]";
       } else if (stateText === "Target Reached" || stateText === "Home Reached") {
-        badge.className = "cat-badge badge-lime";
+        badge.className = "cat-badge badge-lime !h-[18px] !text-[9px]";
       } else if (stateText === "Error") {
-        badge.className = "cat-badge badge-coral";
+        badge.className = "cat-badge badge-coral !h-[18px] !text-[9px]";
       }
     }
 
@@ -1974,6 +1874,7 @@
       isSlotConfigDirty = false;
       saveLocalPersistence();
       updateSlotConfigDirtyUI();
+      updateRetZOffsetPreview();
       renderRackMatrix();
 
       await patchConfigToFirebase({ coordinates: BOX_COORDINATES });
@@ -2036,9 +1937,6 @@
       }
     }
 
-    // =========================================================================
-    // VIEW & SUB-TAB NAVIGATION
-    // =========================================================================
     function switchPrimaryView(viewName) {
       const opTab = document.getElementById("viewTab-operator");
       const setTab = document.getElementById("viewTab-settings");
@@ -2050,7 +1948,6 @@
         setTab.setAttribute("aria-selected", "false");
         opPanel.classList.remove("hidden");
         setPanel.classList.add("hidden");
-        if (asrsTwin) requestAnimationFrame(() => asrsTwin.resize());
       } else {
         opTab.setAttribute("aria-selected", "false");
         setTab.setAttribute("aria-selected", "true");
@@ -2075,9 +1972,6 @@
       });
     }
 
-    // =========================================================================
-    // FIREBASE RTDB SYNCHRONIZATION (INVENTORY, PRODUCTS, CONFIG & TELEMETRY)
-    // =========================================================================
     async function syncInventoryToFirebase() {
       try {
         await Promise.all([
@@ -2133,6 +2027,9 @@
           if (cfgData && typeof cfgData === "object") {
             if (typeof cfgData.z_offset === "number") {
               zLiftOffsetRev = cfgData.z_offset;
+            }
+            if (typeof cfgData.ret_z_offset === "number") {
+              retrievalZOffsetRev = cfgData.ret_z_offset;
             }
             if (cfgData.coordinates && typeof cfgData.coordinates === "object") {
               FIFO_SLOT_PRIORITY.forEach(k => {
@@ -2262,27 +2159,11 @@
 
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         appendLog(`Delivered: "${cleanCmd}"`, "success");
+        return true;
       } catch (err) {
         appendLog(`Command failed: ${err.message}`, "error");
         return false;
       }
-
-      // Notify 3D Digital Twin independently so a cached script or UI error can never
-      // cause a delivered Firebase command to report "Failed to dispatch"
-      try {
-        if (asrsTwin) {
-          cadSimActive = false;
-          const simBtn = document.getElementById("cadSimBtn");
-          if (simBtn) simBtn.classList.remove("active");
-          if (typeof asrsTwin.notifyCommand === "function") {
-            asrsTwin.notifyCommand(cleanCmd);
-          }
-        }
-      } catch (twinErr) {
-        console.warn("[AsrsCadTwin] notifyCommand skipped:", twinErr);
-      }
-
-      return true;
     }
 
     function sendRevolutionCommand() {
@@ -2377,188 +2258,139 @@
       }
     }
 
-    // Real-time Firebase RTDB SSE cache & stream handle
-    let liveTelemetryCache = {};
-    let telemetryEventSource = null;
-    let telemetryStreamConnected = false;
-
-    function applyTelemetryPayload(data) {
-      esp32Online = true;
-      const dot = document.getElementById("connDot");
-      const connText = document.getElementById("connStateText");
-      dot.className = "w-2 h-2 rounded-full bg-[#AFFF00]";
-      if (connText) connText.textContent = "ONLINE";
-
-      if (!data || typeof data !== "object") return;
-
-      const prevRunning = esp32Running;
-      const statusStr = String(data.status || "ONLINE").toUpperCase();
-      esp32Running = !!data.running;
-      esp32Locked = !!data.locked;
-      if (prevRunning && !esp32Running && !pendingOperation) {
-        fetchInventoryFromFirebase();
-      }
-
-      const badge = document.getElementById("systemStatusBadge");
-      badge.textContent = statusStr;
-      badge.className = esp32Locked
-        ? "cat-badge badge-coral !h-[20px] !min-w-[54px] !text-[10px]"
-        : esp32Running
-          ? "cat-badge badge-yellow !h-[20px] !min-w-[54px] !text-[10px]"
-          : "cat-badge badge-mint !h-[20px] !min-w-[54px] !text-[10px]";
-
-      const lockBadge = document.getElementById("lockStateBadge");
-      if (lockBadge) {
-        lockBadge.textContent = esp32Locked ? "LOCKED" : "UNLOCKED";
-        lockBadge.className = esp32Locked ? "cat-badge badge-coral" : "cat-badge badge-mint";
-      }
-
-      const m1RevVal = Number(data.m1_rev || 0);
-      const m2RevVal = Number(data.m2_rev || 0);
-      document.getElementById("m1Rev").textContent = m1RevVal.toFixed(2);
-      document.getElementById("m2Rev").textContent = m2RevVal.toFixed(2);
-      document.getElementById("m1Steps").textContent = data.m1_steps || 0;
-      document.getElementById("m2Steps").textContent = data.m2_steps || 0;
-
-      if (data.servo_state !== undefined) {
-        const svBadge = document.getElementById("servoStateBadge");
-        svBadge.textContent = data.servo_state;
-        svBadge.className = data.servo_state === "STOP"
-          ? "cat-badge badge-muted"
-          : "cat-badge badge-yellow";
-      }
-      if (data.box !== undefined) {
-        document.getElementById("activeBoxBadge").textContent =
-          data.op && data.op !== "NONE" ? `${data.box} (${data.op})` : data.box;
-      }
-      if (data.step_stage !== undefined) {
-        document.getElementById("cycleStagePill").textContent =
-          data.step_stage > 0 ? `STEP ${data.step_stage} / 6` : statusStr;
-        updateSequenceStepHighlight(data.step_stage);
-      }
-      if (data.rpm !== undefined || data.accel !== undefined) {
-        updateGaugesUI(data.rpm, data.accel);
-      }
-      if (data.servo_ext_rev !== undefined) {
-        document.getElementById("liveServoExtRev").textContent = Number(data.servo_ext_rev).toFixed(2);
-      }
-      if (data.servo_ret_rev !== undefined) {
-        document.getElementById("liveServoRetRev").textContent = Number(data.servo_ret_rev).toFixed(2);
-      }
-      if (data.z_offset !== undefined && !isNaN(parseFloat(data.z_offset))) {
-        zLiftOffsetRev = parseFloat(data.z_offset);
-        updateZOffsetReadouts();
-      }
-
-      // 1. Hardware Confirmation Check for Pending STORE / RETRIEVE Operations
-      if (pendingOperation) {
-        if (esp32Running || Number(data.step_stage) > 0) {
-          pendingOperation.sawRunning = true;
-        }
-        if (esp32Locked || statusStr.includes("STOP") || statusStr.includes("REJECTED") || statusStr.includes("INVALID")) {
-          setOperationFeedback(`Aborted by ESP32: ${statusStr}`, "error");
-          pendingOperation = null;
-          const syncBadge = document.getElementById("pendingSyncBadge");
-          if (syncBadge) {
-            syncBadge.textContent = "ABORTED";
-            syncBadge.className = "cat-badge badge-coral !h-[18px] !text-[9px]";
-          }
-          renderRackMatrix();
-        } else if (
-          statusStr.includes("CYCLE COMPLETE") ||
-          (pendingOperation.sawRunning && !esp32Running && Number(data.step_stage) === 0)
-        ) {
-          commitPendingOperationOnHardwareConfirm();
-        }
-      }
-
-      // 2. Hardware Confirmation Check for Individual Slot Test Move & Return Home
-      if (currentTestMoveState === "Moving to Target") {
-        const targetC = BOX_COORDINATES[selectedBox];
-        if (esp32Locked) {
-          setSlotTestStatus("Error");
-        } else if (
-          statusStr.includes("TARGET REACHED") ||
-          (!esp32Running && targetC && Math.abs(m1RevVal - targetC.x) < 0.05 && Math.abs(m2RevVal - targetC.z) < 0.05)
-        ) {
-          setSlotTestStatus("Target Reached");
-        }
-      } else if (currentTestMoveState === "Returning Home") {
-        if (esp32Locked) {
-          setSlotTestStatus("Error");
-        } else if (
-          (statusStr.includes("HOME") && !esp32Running) ||
-          (!esp32Running && Math.abs(m1RevVal) < 0.03 && Math.abs(m2RevVal) < 0.03)
-        ) {
-          setSlotTestStatus("Home Reached");
-        }
-      }
-
-      // 3. Push live Firebase telemetry directly into the 3D CAD Digital Twin
-      if (asrsTwin && (!cadSimActive || esp32Running || esp32Locked || Number(data.step_stage) > 0)) {
-        cadSimActive = false;
-        const simBtn = document.getElementById("cadSimBtn");
-        if (simBtn) simBtn.classList.remove("active");
-        asrsTwin.updateFromTelemetry(data, BOX_OCCUPANCY, BOX_COORDINATES);
-      }
-
-      renderRackMatrix();
-    }
-
-    // Real-time Firebase RTDB SSE Stream (<50ms latency when ESP32 updates /asrs/telemetry)
-    function startRealtimeTelemetryStream() {
-      if (typeof EventSource === "undefined") return;
-      try {
-        if (telemetryEventSource) telemetryEventSource.close();
-        const streamUrl = `${FIREBASE_HOST}/asrs/telemetry.json?auth=${FIREBASE_AUTH}`;
-        telemetryEventSource = new EventSource(streamUrl);
-
-        telemetryEventSource.onopen = () => {
-          telemetryStreamConnected = true;
-        };
-
-        const handleSsePayload = (ev, isPatch) => {
-          try {
-            const msg = JSON.parse(ev.data);
-            if (!msg || msg.path === undefined) return;
-            telemetryStreamConnected = true;
-            if (msg.path === "/") {
-              if (isPatch && msg.data && typeof msg.data === "object") {
-                liveTelemetryCache = Object.assign({}, liveTelemetryCache, msg.data);
-              } else if (msg.data && typeof msg.data === "object") {
-                liveTelemetryCache = Object.assign({}, msg.data);
-              }
-            } else {
-              const key = msg.path.replace(/^\//, "").split("/")[0];
-              if (key) {
-                liveTelemetryCache = Object.assign({}, liveTelemetryCache, { [key]: msg.data });
-              }
-            }
-            applyTelemetryPayload(liveTelemetryCache);
-          } catch (err) {}
-        };
-
-        telemetryEventSource.addEventListener("put", (ev) => handleSsePayload(ev, false));
-        telemetryEventSource.addEventListener("patch", (ev) => handleSsePayload(ev, true));
-
-        telemetryEventSource.onerror = () => {
-          telemetryStreamConnected = false;
-        };
-      } catch (e) {
-        telemetryStreamConnected = false;
-      }
-    }
-
-    // Poll ESP32 Telemetry (/asrs/telemetry) as initial load & fast fallback when SSE is inactive
     async function fetchTelemetry() {
       try {
         const url = `${FIREBASE_HOST}/asrs/telemetry.json?auth=${FIREBASE_AUTH}`;
         const response = await fetch(url);
         if (!response.ok) throw new Error("Offline");
         const data = await response.json();
-        if (data && typeof data === "object") {
-          liveTelemetryCache = Object.assign({}, data);
-          applyTelemetryPayload(liveTelemetryCache);
+
+        esp32Online = true;
+        const dot = document.getElementById("connDot");
+        const connText = document.getElementById("connStateText");
+        dot.className = "w-2 h-2 rounded-full bg-[#AFFF00]";
+        if (connText) connText.textContent = "ONLINE";
+
+        if (data) {
+          const statusStr = String(data.status || "ONLINE").toUpperCase();
+          esp32Running = !!data.running;
+          esp32Locked = !!data.locked;
+
+          const badge = document.getElementById("systemStatusBadge");
+          badge.textContent = statusStr;
+          badge.className = esp32Locked
+            ? "cat-badge badge-coral !h-[20px] !min-w-[54px] !text-[10px]"
+            : esp32Running
+              ? "cat-badge badge-yellow !h-[20px] !min-w-[54px] !text-[10px]"
+              : "cat-badge badge-mint !h-[20px] !min-w-[54px] !text-[10px]";
+
+          const lockBadge = document.getElementById("lockStateBadge");
+          if (lockBadge) {
+            lockBadge.textContent = esp32Locked ? "LOCKED" : "UNLOCKED";
+            lockBadge.className = esp32Locked ? "cat-badge badge-coral" : "cat-badge badge-mint";
+          }
+
+          const m1RevVal = Number(data.m1_rev || 0);
+          const m2RevVal = Number(data.m2_rev || 0);
+          document.getElementById("m1Rev").textContent = m1RevVal.toFixed(2);
+          document.getElementById("m2Rev").textContent = m2RevVal.toFixed(2);
+          document.getElementById("m1Steps").textContent = data.m1_steps || 0;
+          document.getElementById("m2Steps").textContent = data.m2_steps || 0;
+
+          if (data.servo_state !== undefined) {
+            const svBadge = document.getElementById("servoStateBadge");
+            svBadge.textContent = data.servo_state;
+            svBadge.className = data.servo_state === "STOP"
+              ? "cat-badge badge-muted"
+              : "cat-badge badge-yellow";
+          }
+          if (data.box !== undefined) {
+            document.getElementById("activeBoxBadge").textContent =
+              data.op && data.op !== "NONE" ? `${data.box} (${data.op})` : data.box;
+          }
+          if (data.step_stage !== undefined) {
+            document.getElementById("cycleStagePill").textContent =
+              data.step_stage > 0 ? `STEP ${data.step_stage} / 6` : statusStr;
+            updateSequenceStepHighlight(data.step_stage);
+          }
+          if (data.rpm !== undefined || data.accel !== undefined) {
+            updateGaugesUI(data.rpm, data.accel);
+          }
+          if (data.servo_ext_rev !== undefined) {
+            document.getElementById("liveServoExtRev").textContent = Number(data.servo_ext_rev).toFixed(2);
+          }
+          if (data.servo_ret_rev !== undefined) {
+            document.getElementById("liveServoRetRev").textContent = Number(data.servo_ret_rev).toFixed(2);
+          }
+          if (data.z_offset !== undefined && !isNaN(parseFloat(data.z_offset))) {
+            zLiftOffsetRev = parseFloat(data.z_offset);
+          }
+          if (data.ret_z_offset !== undefined && !isNaN(parseFloat(data.ret_z_offset))) {
+            retrievalZOffsetRev = parseFloat(data.ret_z_offset);
+          }
+          updateZOffsetReadouts();
+
+          // 1. Hardware Confirmation Check for Pending STORE / RETRIEVE Operations
+          if (pendingOperation) {
+            const elapsedMs = Date.now() - pendingOperation.dispatchedAt;
+
+            if (
+              (esp32Running && Number(data.step_stage) > 0) ||
+              statusStr.includes("STEP 3") ||
+              statusStr.includes("STEP 4") ||
+              statusStr.includes("STEP 5") ||
+              statusStr.includes("STEP 6")
+            ) {
+              pendingOperation.sawRunning = true;
+            }
+
+            const isExplicitAbortStatus =
+              statusStr === "STOPPED" ||
+              statusStr.startsWith("EMERGENCY") ||
+              statusStr.startsWith("REJECTED") ||
+              statusStr.startsWith("INVALID") ||
+              (pendingOperation.sawRunning && statusStr === "STOPPED");
+
+            if (esp32Locked || (elapsedMs > 1200 && isExplicitAbortStatus)) {
+              setOperationFeedback(`Aborted by ESP32: ${statusStr}`, "error");
+              pendingOperation = null;
+              const syncBadge = document.getElementById("pendingSyncBadge");
+              if (syncBadge) {
+                syncBadge.textContent = "ABORTED";
+                syncBadge.className = "cat-badge badge-coral !h-[18px] !text-[9px]";
+              }
+              renderRackMatrix();
+            } else if (
+              (pendingOperation.sawRunning && statusStr.includes("CYCLE COMPLETE")) ||
+              (pendingOperation.sawRunning && !esp32Running && Number(data.step_stage) === 0)
+            ) {
+              commitPendingOperationOnHardwareConfirm();
+            }
+          }
+
+          // 2. Hardware Confirmation Check for Individual Slot Test Move & Return Home
+          if (currentTestMoveState === "Moving to Target") {
+            const targetC = BOX_COORDINATES[selectedBox];
+            if (esp32Locked) {
+              setSlotTestStatus("Error");
+            } else if (
+              statusStr.includes("TARGET REACHED") ||
+              (!esp32Running && targetC && Math.abs(m1RevVal - targetC.x) < 0.05 && Math.abs(m2RevVal - targetC.z) < 0.05)
+            ) {
+              setSlotTestStatus("Target Reached");
+            }
+          } else if (currentTestMoveState === "Returning Home") {
+            if (esp32Locked) {
+              setSlotTestStatus("Error");
+            } else if (
+              (statusStr.includes("HOME") && !esp32Running) ||
+              (!esp32Running && Math.abs(m1RevVal) < 0.03 && Math.abs(m2RevVal) < 0.03)
+            ) {
+              setSlotTestStatus("Home Reached");
+            }
+          }
+
+          renderRackMatrix();
         }
       } catch (e) {
         esp32Online = false;
@@ -2568,97 +2400,11 @@
       }
     }
 
-    // =========================================================================
-    // 3D CAD DIGITAL TWIN INITIALIZATION & VIEW CONTROLS
-    // =========================================================================
-    function initCadDigitalTwin() {
-      const canvasEl = document.getElementById("asrsCadCanvas");
-      if (!canvasEl || typeof AsrsCadTwin === "undefined") return;
-
-      asrsTwin = new AsrsCadTwin({
-        canvas: canvasEl,
-        assetPath: CAD_ASSET_PATH,
-        cropMode: "compact",
-        showTopChips: true,
-        showLegend: true,
-        showBayLabels: cadBayLabelsOn,
-        enableClickToSelect: true,
-        initialOccupancy: BOX_OCCUPANCY,
-        coordinates: BOX_COORDINATES,
-        onBayClick: (bayId) => onUserClickSlot(bayId)
-      });
-      syncCadTwinState();
-    }
-
-    function syncCadTwinState() {
-      if (!asrsTwin) return;
-      if (!cadSimActive) {
-        asrsTwin.setOccupancy(BOX_OCCUPANCY);
-      }
-      asrsTwin.setCoordinates(BOX_COORDINATES);
-      asrsTwin.setSelectedBay(selectedBox);
-    }
-
-    function setRackVisualMode(mode) {
-      if (!["split", "3d", "matrix"].includes(mode)) return;
-      cadVisualMode = mode;
-      const ws = document.getElementById("rackVisualWorkspace");
-      if (ws) {
-        ws.classList.remove("mode-split", "mode-3d", "mode-matrix");
-        ws.classList.add(`mode-${mode}`);
-      }
-      ["split", "3d", "matrix"].forEach((m) => {
-        const btn = document.getElementById(`vizBtn-${m}`);
-        if (!btn) return;
-        btn.className = `mode-pill-btn ${m === mode ? "active-mode" : "inactive-mode"} !h-[28px] !px-2.5 !text-[11px]`;
-      });
-      if (asrsTwin && mode !== "matrix") {
-        asrsTwin.setOption("cropMode", mode === "3d" ? "wide" : "compact");
-        requestAnimationFrame(() => asrsTwin.resize());
-      }
-    }
-
-    function toggleCadBayLabels() {
-      cadBayLabelsOn = !cadBayLabelsOn;
-      const btn = document.getElementById("cadLabelsBtn");
-      if (btn) btn.classList.toggle("active", cadBayLabelsOn);
-      if (asrsTwin) asrsTwin.setOption("showBayLabels", cadBayLabelsOn);
-    }
-
-    function previewCadDemoCycle() {
-      if (!asrsTwin) return;
-      if (esp32Running || pendingOperation) {
-        setOperationFeedback("Live ESP32 cycle in progress — 3D Twin is tracking real hardware.", "info");
-        return;
-      }
-      const target = selectedBox || "C2";
-      const opType = BOX_OCCUPANCY[target] ? "RETRIEVAL" : "STORAGE";
-      cadSimActive = true;
-      const simBtn = document.getElementById("cadSimBtn");
-      if (simBtn) simBtn.classList.add("active");
-      asrsTwin.setOccupancy(BOX_OCCUPANCY);
-      asrsTwin.runDemoCycle(opType, target, {
-        rpm: 60,
-        duration: 8.5,
-        onComplete: () => {
-          cadSimActive = false;
-          if (simBtn) simBtn.classList.remove("active");
-          syncCadTwinState();
-        }
-      });
-    }
-
     loadLocalPersistence();
-    initCadDigitalTwin();
     renderRackMatrix();
     fetchInventoryFromFirebase();
     fetchTelemetry();
-    startRealtimeTelemetryStream();
-    // Fast 450ms HTTP fallback when SSE isn't active + 3s reconciliation heartbeat
-    setInterval(() => {
-      if (!telemetryStreamConnected) fetchTelemetry();
-    }, 450);
-    setInterval(fetchTelemetry, 3000);
+    setInterval(fetchTelemetry, 1000);
   </script>
 </body>
 </html>
